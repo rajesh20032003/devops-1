@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Microservices Dashboard</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f8;
+      text-align: center;
+    }
+
+    .card {
+      display: inline-block;
+      margin: 20px;
+      padding: 20px;
+      width: 220px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 { color: #333; }
+
+    .loading {
+      color: #888;
+      font-size: 14px;
+    }
+
+    .updated {
+      margin-top: 15px;
+      color: #777;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🚀 Microservices Dashboard</h1>
+
+<div class="card">
+  <h2 id="users">--</h2>
+  <p>Users</p>
+</div>
+
+<div class="card">
+  <h2 id="orders">--</h2>
+  <p>Orders</p>
+</div>
+
+<p class="loading" id="status">Loading...</p>
+<p class="updated" id="updated"></p>
+
+<script>
+async function loadData() {
+  const status = document.getElementById("status");
+
+  try {
+    status.innerText = "Updating...";
+    const res = await fetchfetch("/api/dashboard");
+    const data = await res.json();
+
+    document.getElementById("users").innerText = data.userCount;
+    document.getElementById("orders").innerText = data.orderCount;
+
+    document.getElementById("updated").innerText =
+      "Last updated: " + new Date().toLocaleTimeString();
+
+    status.innerText = "Live";
+    status.style.color = "green";
+
+  } catch (err) {
+    status.innerText = "Service unavailable";
+    status.style.color = "red";
+  }
+}
+
+// initial load
+loadData();
+
+// refresh every 5 seconds
+setInterval(loadData, 5000);
+</script>
+
+</body>
+</html>

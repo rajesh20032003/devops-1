@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Microservices Dashboard</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f6f8;
+      text-align: center;
+    }
+    .card {
+      display: inline-block;
+      margin: 20px;
+      padding: 20px;
+      width: 200px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; }
+  </style>
+</head>
+<body>
+
+<h1>🚀 Microservices Dashboard</h1>
+
+<div class="card">
+  <h2 id="users">0</h2>
+  <p>Users</p>
+</div>
+
+<div class="card">
+  <h2 id="orders">0</h2>
+  <p>Orders</p>
+</div>
+
+<script>
+async function loadData(){
+  const res = await fetch("http://localhost:3000/api/dashboard");
+  const data = await res.json();
+
+  document.getElementById("users").innerText = data.userCount;
+  document.getElementById("orders").innerText = data.orderCount;
+}
+loadData();
+</script>
+
+</body>
+</html>

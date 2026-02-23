@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "100:80"
+    depends_on:
+      - gateway
+    networks:
+     - frontend
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
+      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL}
+    depends_on:
+      - user-service
+      - order-service
+    networks:
+     - frontend
+     - backend
+
+  user-service:
+    build: ./user-service
+    networks:
+     - backend
+
+  order-service:
+    build: ./order-service
+    networks:
+     - backend
+
+
+networks:
+  frontend:
+  backend:

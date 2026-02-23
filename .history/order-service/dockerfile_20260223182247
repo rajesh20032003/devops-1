@@ -1,0 +1,20 @@
+#single build -> 134mb
+# FROM node:18-alpine
+# WORKDIR /app
+# COPY package.json .
+# RUN npm install
+# COPY . .
+# CMD ["node","app.js"]
+
+
+#multi build -> 
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package.json .
+RUN npm install
+COPY . .
+FROM gcr.io/distroless/nodejs22-debian12
+COPY --from=build /app /app
+WORKDIR /app
+USER nonroot
+CMD ["app.js"]
