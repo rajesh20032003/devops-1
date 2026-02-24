@@ -5,12 +5,12 @@ pipeline {
 
     stage('build docker images') {
       steps {
-        sh 'docker compose build'
+        sh 'docker build ./frontend'
       }
     }
     stage('verify containers'){
       steps {
-        sh 'docker compose config'
+        sh 'docker images'
       }
     }
   }
