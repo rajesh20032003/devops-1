@@ -11,6 +11,7 @@ services:
      - frontend
     volumes:
      - ./frontend:/usr/share/nginx/html
+    restart: unless-stopped
 
   gateway:
     build: ./gateway
@@ -25,16 +26,21 @@ services:
     networks:
      - frontend
      - backend
+    restart: on-failure:5
 
   user-service:
     build: ./user-service
     networks:
      - backend
+    restart: unless-stopped
+
 
   order-service:
     build: ./order-service
     networks:
      - backend
+    restart: unless-stopped
+
 
 
 networks:
