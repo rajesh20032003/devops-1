@@ -54,7 +54,7 @@ pipeline {
     }
 
     stage('Push Images to Registry') {
-      when { branch 'main' }  // only push on main branch
+      // when { branch 'main' }  // only push on main branch
       steps {
         script {
           // Login to Docker Hub (or ECR, GCR, etc.)
