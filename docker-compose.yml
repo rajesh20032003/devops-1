@@ -9,6 +9,8 @@ services:
       - gateway
     networks:
      - frontend
+    volumes:
+     - ./frontend:/usr/share/nginx/html
 
   gateway:
     build: ./gateway

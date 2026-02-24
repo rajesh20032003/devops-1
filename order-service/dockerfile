@@ -14,9 +14,7 @@ COPY package.json .
 RUN npm install
 COPY . .
 FROM gcr.io/distroless/nodejs22-debian12
-COPY --from=build /app/packge*.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/app.js ./
+COPY --from=build /app /app
 WORKDIR /app
 USER nonroot
 CMD ["app.js"]
