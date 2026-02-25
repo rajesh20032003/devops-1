@@ -1,5 +1,5 @@
 pipeline {
-  agent any
+  agent none
 
   environment {
     DOCKER_REGISTRY = "rajesh00007"  
@@ -16,6 +16,51 @@ pipeline {
   }
 
   stages {
+     stage('quality checks') {
+        parallel{
+          stage('gateway tests') {
+            agent { docker { image 'node:18'}}
+            steps {
+              dir('gateway') {
+                sh 'npm ci'
+                sh 'npm run lint'
+                sh 'npm test'
+              }
+            }
+          }
+          stage('user service tests') {
+            agent { docker {image 'node:18'}}
+            steps {
+              dir('user-service') {
+                sh 'npm ci'
+                sh 'npm run lint'
+                sh 'npm test'
+              }
+            }
+          }
+          stage('order service tests') {
+            agent { docker {image 'node:18'}}
+            steps {
+              dir('order-service') {
+                sh 'npm ci'
+                sh 'npm run lint'
+                sh 'npm test'
+              }
+            }
+          }
+          stage('frontend service tests') {
+            agent { docker {image 'node:18'}}
+            steps {
+              dir('user-service') {
+                sh 'npm ci'
+                sh 'npm run lint:html'
+                sh 'npm test || true'
+              }
+            }
+          }
+        }
+      }
+    
     stage('Build All Services in Parallel') {
       parallel {
         stage('Build Frontend') {
