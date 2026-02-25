@@ -12,16 +12,15 @@
     "test:watch": "jest --watch --coverage",
     "lint": "eslint ."
   },
-  
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
     "@eslint/js": "^9.39.3",
     "eslint": "^9.39.3",
     "globals": "^17.3.0",
     "jest": "^30.2.0",
     "supertest": "^7.2.2"
-  }
+  },
+  "description": ""
 }
