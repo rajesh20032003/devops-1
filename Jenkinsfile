@@ -2,9 +2,8 @@ pipeline {
   agent any
 
   environment {
-    // Optional: prefix all images with your Docker Hub username / org
-    DOCKER_REGISTRY = "rajesh00007"   // ← change to your username or ECR repo
-    IMAGE_TAG       = "${env.BUILD_NUMBER}"   // or "${env.GIT_COMMIT}"
+    DOCKER_REGISTRY = "rajesh00007"  
+    IMAGE_TAG       = "${env.BUILD_NUMBER}"   
   }
 
   options {
@@ -54,10 +53,9 @@ pipeline {
     }
 
     stage('Push Images to Registry') {
-      when { branch 'main' }  // only push on main branch
+      // when { branch 'main' }  // only push on main branch
       steps {
         script {
-          // Login to Docker Hub (or ECR, GCR, etc.)
           docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
             docker.image("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}").push()
             docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push()
@@ -72,18 +70,15 @@ pipeline {
 
   post {
     always {
-      // Clean up Docker images to save space on agent
       sh 'docker image prune -f'
     }
 
     success {
       echo "All images built & pushed successfully!"
-      // Optional: notify Slack / email
     }
 
     failure {
       echo "Build failed!"
-      // Optional: notify on failure
     }
   }
 }

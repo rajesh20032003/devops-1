@@ -1,3 +1,4 @@
 dockerfile
 .git
 .gitignore
+node_modules

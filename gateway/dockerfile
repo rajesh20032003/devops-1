@@ -5,14 +5,14 @@
 # COPY . .
 # CMD ["node","app.js"]
 # single build 139 mb 
-
+#gateway
 from node:18-alpine as builder
 workdir /app
-copy package.json .
-run npm install
+copy package*.json ./
+run npm ci --omit=dev
 copy . . 
 from gcr.io/distroless/nodejs22-debian12
-copy --from=builder /app /app
 workdir /app
+copy --from=builder /app /app
 user nonroot
-cmd ["app.js"]
+cmd ["server.js"]

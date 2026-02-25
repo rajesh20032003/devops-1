@@ -11,5 +11,9 @@ app.get("/orders", (req, res) => {
 app.get("/health",(req,res)=>{
   res.json({status:"UP"});
 });
+app.get("/test", (req, res) => {
+  res.status(200).send("OK");
+});
 
-app.listen(3002, () => console.log("Order service running"));
+
+module.exports = app;

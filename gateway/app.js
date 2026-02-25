@@ -18,8 +18,12 @@ app.get("/api/dashboard", async (req, res) => {
       orderCount: orders.data.length
     });
   } catch (err) {
-    res.status(500).json({ error: "Service communication failed" });
+    res.status(500).json({ error: "Service communication failed" }).send(err);
   }
 });
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 
-app.listen(3000, () => console.log("Gateway running"));
+// app.listen(3000, () => console.log("Gateway running"));
+module.exports = app;
