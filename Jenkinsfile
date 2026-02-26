@@ -60,6 +60,26 @@ pipeline {
           }
         }
       }
+//sonarqube
+    stage('sonarqube analysis') {
+      agent {
+        docker { image 'sonarsource/sonar-scanner-cli:latest'}
+      }
+      environment {
+        SONAR_TOKEN = credentials('sonar-token')
+      }
+      steps{
+        withSonarQubeEnv('sonarqube') {
+          sh '''
+            sonar-scanner \
+             -Dsonar.projectKey=micro-dash \
+             -Dsonar.sources=. \
+             -Dsonar.host.url=http://sonarqube:9000 \
+             -Dsonar.login=$SONAR_TOKEN
+             '''
+        }
+      }
+    }
     
     stage('Build All Services in Parallel') {
       parallel {
@@ -97,8 +117,20 @@ pipeline {
       }
     }
 
+//trivy scan
+    stage('trivy scan images'){
+      steps{
+        sh '''
+        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
+        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
+        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
+        '''
+      }
+    }
+
     stage('Push Images to Registry') {
-      // when { branch 'main' }  // only push on main branch
+       when { branch 'main' }  // only push on main branch
       steps {
         script {
           docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
