@@ -114,11 +114,7 @@ pipeline {
   }
 
   post {
-    always {
-       script {
-         sh 'docker image prune -f'
-    }
-    }
+  
 
     success {
       echo "All images built & pushed successfully!"
