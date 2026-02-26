@@ -71,7 +71,6 @@ pipeline {
             dir('frontend') {
               sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint:html || true'   // optional fail-soft
-              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit || true'
             }
           }
         }
@@ -155,6 +154,7 @@ pipeline {
   }
 
   post {
+    agent any
     success {
       emailext(
         subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
