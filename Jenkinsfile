@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     DOCKER_REGISTRY = "rajesh00007"
-    IMAGE_TAG       = "${env.GIT_COMMIT.take(7)}"
+    IMAGE_TAG = "${env.GIT_COMMIT?.take(7) ?: env.BUILD_NUMBER}"
   }
 
   options {
@@ -14,8 +14,10 @@ pipeline {
   }
 
   stages {
+
     stage('Quality Checks') {
       parallel {
+
         stage('Gateway') {
           agent { docker { image 'node:22-alpine' } }
           steps {
@@ -28,7 +30,7 @@ pipeline {
           post {
             always {
               junit allowEmptyResults: true, testResults: 'gateway/coverage/junit.xml'
-              recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
+              recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
             }
           }
         }
@@ -43,10 +45,10 @@ pipeline {
             }
           }
           post {
-           always {
-             junit '**/junit.xml'
+            always {
+              junit allowEmptyResults: true, testResults: '**/coverage/junit.xml'
+            }
           }
-         }
         }
 
         stage('Order Service') {
@@ -59,10 +61,10 @@ pipeline {
             }
           }
           post {
-           always {
-             junit '**/junit.xml'
+            always {
+              junit allowEmptyResults: true, testResults: '**/coverage/junit.xml'
+            }
           }
-         }
         }
 
         stage('Frontend') {
@@ -70,27 +72,28 @@ pipeline {
           steps {
             dir('frontend') {
               sh 'npm ci --prefer-offline --no-audit'
-              sh 'npm run lint:html || true'   // optional fail-soft
+              sh 'npm run lint:html || true'
             }
           }
         }
+
       }
     }
 
     stage('SonarQube Analysis') {
       agent any
       environment {
-        SONAR_TOKEN = credentials('sonar-token')  // Add this in Jenkins credentials
+        SONAR_TOKEN = credentials('sonar-token')
       }
       steps {
-        withSonarQubeEnv('SonarQube') {  // Configure SonarQube server in Jenkins global settings
+        withSonarQubeEnv('SonarQube') {
           sh '''
             sonar-scanner \
               -Dsonar.projectKey=micro-dash \
               -Dsonar.sources=. \
               -Dsonar.host.url=http://34.14.148.93:9000 \
               -Dsonar.token=$SONAR_TOKEN \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
+              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
           '''
         }
       }
@@ -98,30 +101,35 @@ pipeline {
 
     stage('Build Images') {
       parallel {
+
         stage('Build Frontend') {
           agent any
           steps {
             sh "docker build -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} ./frontend"
           }
         }
+
         stage('Build Gateway') {
           agent any
           steps {
             sh "docker build -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} ./gateway"
           }
         }
+
         stage('Build User Service') {
           agent any
           steps {
             sh "docker build -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} ./user-service"
           }
         }
+
         stage('Build Order Service') {
           agent any
           steps {
             sh "docker build -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} ./order-service"
           }
         }
+
       }
     }
 
@@ -151,18 +159,25 @@ pipeline {
         }
       }
     }
+
+    stage('Cleanup') {
+      agent any
+      steps {
+        sh 'docker image prune -f || true'
+      }
+    }
+
   }
 
   post {
-    //agent any
     success {
       emailext(
         subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body: "Build succeeded!\nURL: ${env.BUILD_URL}",
-        to: "rajeshgovindan777@gmail.com",
-        mimeType: "text/plain"
+        to: "rajeshgovindan777@gmail.com"
       )
     }
+
     failure {
       emailext(
         subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
@@ -171,11 +186,6 @@ pipeline {
         attachLog: true,
         compressLog: true
       )
-    }
-    always {
-      node {
-      sh 'docker image prune -f'
-      }
     }
   }
 }
