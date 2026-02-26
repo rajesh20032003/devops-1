@@ -106,7 +106,7 @@ pipeline {
     SONAR_TOKEN = credentials('sonar-token')
   }
   steps {
-    withSonarQubeEnv('Sonarqube') {
+    withSonarQubeEnv('sonarqube') {
       sh '''
         docker run --rm \
           -e SONAR_TOKEN=$SONAR_TOKEN \
