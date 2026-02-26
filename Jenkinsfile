@@ -101,27 +101,27 @@ pipeline {
     //   }
     // }
   stage('SonarQube Analysis') {
-      agent {
-        docker {
-          image 'sonarsource/sonar-scanner-cli:latest'
-          args '--entrypoint="" --user root'  // ← fix here
-        }
-      }
-      environment {
-        SONAR_TOKEN = credentials('sonar-token')
-      }
-      steps {
-        withSonarQubeEnv('Sonarqube') {
-          sh '''
-            sonar-scanner \
-              -Dsonar.projectKey=micro-dash \
-              -Dsonar.sources=. \
-              -Dsonar.host.url=http://34.14.148.93:9000 \
-              -Dsonar.token=$SONAR_TOKEN \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
-          '''
-        }
-      }
+  agent {
+    docker {
+      image 'sonarsource/sonar-scanner-cli:latest'
+      args '--entrypoint=""'
+    }
+  }
+  environment {
+    SONAR_TOKEN = credentials('sonar-token')
+  }
+  steps {
+    withSonarQubeEnv('Sonarqube') {
+      sh '''
+        sonar-scanner \
+          -Dsonar.projectKey=micro-dash \
+          -Dsonar.sources=. \
+          -Dsonar.host.url=http://34.14.148.93:9000 \
+          -Dsonar.token=$SONAR_TOKEN \
+          -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
+      '''
+    }
+  }
 }
     stage('Build Images') {
       parallel {
