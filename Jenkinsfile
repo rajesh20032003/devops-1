@@ -80,13 +80,33 @@ pipeline {
       }
     }
 
-    stage('SonarQube Analysis') {
-      agent any
+    // stage('SonarQube Analysis') {
+    //   agent any
+    //   environment {
+    //     SONAR_TOKEN = credentials('sonar-token')
+    //   }
+    //   steps {
+    //     withSonarQubeEnv('sonarqube') {
+    //       sh '''
+    //         sonar-scanner \
+    //           -Dsonar.projectKey=micro-dash \
+    //           -Dsonar.sources=. \
+    //           -Dsonar.host.url=http://34.14.148.93:9000 \
+    //           -Dsonar.token=$SONAR_TOKEN \
+    //           -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
+    //       '''
+    //     }
+    //   }
+    // }
+  stage('SonarQube Analysis') {
+      agent {
+        docker { image 'sonarsource/sonar-scanner-cli:latest' }
+      }
       environment {
         SONAR_TOKEN = credentials('sonar-token')
       }
       steps {
-        withSonarQubeEnv('sonarqube') {
+        withSonarQubeEnv('SonarQube') {
           sh '''
             sonar-scanner \
               -Dsonar.projectKey=micro-dash \
@@ -98,7 +118,6 @@ pipeline {
         }
       }
     }
-
     stage('Build Images') {
       parallel {
 
