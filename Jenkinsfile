@@ -2,174 +2,153 @@ pipeline {
   agent none
 
   environment {
-    DOCKER_REGISTRY = "rajesh00007"  
-    IMAGE_TAG       = "${env.BUILD_NUMBER}"   
+    DOCKER_REGISTRY = "rajesh00007"
+    IMAGE_TAG       = "${env.BUILD_NUMBER}"
   }
 
   options {
-    // Stop pipeline if previous build is still running
     disableConcurrentBuilds()
-    // Keep last 10 builds
     buildDiscarder(logRotator(numToKeepStr: '10'))
-    // Timeout whole pipeline after 30 minutes
-    timeout(time: 30, unit: 'MINUTES')
+    timeout(time: 45, unit: 'MINUTES')
   }
 
   stages {
-     stage('quality checks') {
-        parallel{
-          stage('gateway tests') {
-            agent { docker { image 'node:22'}}
-            steps {
-              dir('gateway') {
-                sh 'npm ci'
-                sh 'npm run lint'
-                sh 'npm test'
-              }
+    stage('Quality Checks') {
+      parallel {
+        stage('Gateway') {
+          agent { docker { image 'node:22-alpine' } }
+          steps {
+            dir('gateway') {
+              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm run lint'
+              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
+          }
           post {
             always {
-            // Publish JUnit test results (shows pass/fail in Jenkins UI)
-            junit allowEmptyResults: true, testResults: 'gateway/test-results/**/*.xml'
-            
-            // Publish coverage (if using Cobertura XML format)
-            recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
-            
-            // Optional: archive coverage report for download
-            archiveArtifacts artifacts: 'gateway/coverage/**', allowEmptyArchive: true
+              junit allowEmptyResults: true, testResults: 'gateway/coverage/junit.xml'
+              recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
+            }
           }
         }
-          }
-          stage('user service tests') {
-            agent { docker {image 'node:22'}}
-            steps {
-              dir('user-service') {
-                sh 'npm ci'
-                sh 'npm run lint'
-                sh 'npm test'
-              }
+
+        stage('User Service') {
+          agent { docker { image 'node:22-alpine' } }
+          steps {
+            dir('user-service') {
+              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm run lint'
+              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
-            post {
-              always {
-            // Publish JUnit test results (shows pass/fail in Jenkins UI)
-            junit allowEmptyResults: true, testResults: 'gateway/test-results/**/*.xml'
-            
-            // Publish coverage (if using Cobertura XML format)
-            recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
-            
-            // Optional: archive coverage report for download
-            archiveArtifacts artifacts: 'gateway/coverage/**', allowEmptyArchive: true
+          }
+          post {
+            always {
+              junit allowEmptyResults: true, testResults: 'user-service/coverage/junit.xml'
+              recordCoverage tools: [[pattern: 'user-service/coverage/cobertura-coverage.xml']]
+            }
           }
         }
-          }
-          stage('order service tests') {
-            agent { docker {image 'node:22'}}
-            steps {
-              dir('order-service') {
-                sh 'npm ci'
-                sh 'npm run lint'
-                sh 'npm test'
-              }
+
+        stage('Order Service') {
+          agent { docker { image 'node:22-alpine' } }
+          steps {
+            dir('order-service') {
+              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm run lint'
+              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
-            post {
-              always {
-            // Publish JUnit test results (shows pass/fail in Jenkins UI)
-            junit allowEmptyResults: true, testResults: 'gateway/test-results/**/*.xml'
-            
-            // Publish coverage (if using Cobertura XML format)
-            recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
-            
-            // Optional: archive coverage report for download
-            archiveArtifacts artifacts: 'gateway/coverage/**', allowEmptyArchive: true
+          }
+          post {
+            always {
+              junit allowEmptyResults: true, testResults: 'order-service/coverage/junit.xml'
+              recordCoverage tools: [[pattern: 'order-service/coverage/cobertura-coverage.xml']]
+            }
           }
         }
-          }
-          stage('frontend service tests') {
-            agent { docker {image 'node:22'}}
-            steps {
-              dir('frontend') {
-                sh 'npm ci'
-                sh 'npm run lint:html || true'
-                sh 'npm test || true'
-              }
+
+        stage('Frontend') {
+          agent { docker { image 'node:22-alpine' } }
+          steps {
+            dir('frontend') {
+              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm run lint'
+              sh 'npm run lint:html || true'   // optional fail-soft
+              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
-           
-        
+          }
+          post {
+            always {
+              junit allowEmptyResults: true, testResults: 'frontend/coverage/junit.xml'
+              recordCoverage tools: [[pattern: 'frontend/coverage/cobertura-coverage.xml']]
+            }
           }
         }
       }
-//sonarqube
-    stage('sonarqube analysis') {
-      agent {
-        docker { image 'sonarsource/sonar-scanner-cli:latest'}
-      }
+    }
+
+    stage('SonarQube Analysis') {
+      agent any
       environment {
-        SONAR_TOKEN = credentials('sonar-token')
+        SONAR_TOKEN = credentials('sonar-token')  // Add this in Jenkins credentials
       }
-      steps{
-        withSonarQubeEnv('sonarqube') {
+      steps {
+        withSonarQubeEnv('SonarQube') {  // Configure SonarQube server in Jenkins global settings
           sh '''
             sonar-scanner \
-             -Dsonar.projectKey=micro-dash \
-             -Dsonar.sources=. \
-             -Dsonar.host.url=http://34.14.148.93:9000 \
-             -Dsonar.token=$SONAR_TOKEN
-             '''
+              -Dsonar.projectKey=micro-dash \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=http://34.14.148.93:9000 \
+              -Dsonar.token=$SONAR_TOKEN \
+              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
+          '''
         }
       }
     }
-    
-    stage('Build All Services in Parallel') { 
+
+    stage('Build Images') {
       parallel {
         stage('Build Frontend') {
+          agent any
           steps {
-            script {
-              docker.build("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}", "./frontend")
-            }
+            sh "docker build -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} ./frontend"
           }
         }
-
         stage('Build Gateway') {
+          agent any
           steps {
-            script {
-              docker.build("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}", "./gateway")
-            }
+            sh "docker build -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} ./gateway"
           }
         }
-
         stage('Build User Service') {
+          agent any
           steps {
-            script {
-              docker.build("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}", "./user-service")
-            }
+            sh "docker build -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} ./user-service"
           }
         }
-
         stage('Build Order Service') {
+          agent any
           steps {
-            script {
-              docker.build("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}", "./order-service")
-            }
+            sh "docker build -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} ./order-service"
           }
         }
       }
     }
 
-//trivy scan
-    stage('trivy scan images'){
+    stage('Trivy Scan') {
       agent any
-      steps{
+      steps {
         sh '''
-        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
-        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
-        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-        trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
         '''
       }
     }
 
-    stage('Push Images to Registry') {
-       when { branch 'main' }  // only push on main branch
+    stage('Push Images') {
+      when { branch 'main' }
+      agent any
       steps {
         script {
           docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
@@ -177,43 +156,32 @@ pipeline {
             docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push()
             docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push()
             docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push()
-
           }
         }
       }
     }
   }
 
-post {
-  success {
-    emailext(
-      subject: "Jenkins Build: ${currentBuild.currentResult} - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-        body: """
-          Build ${currentBuild.currentResult}: ${env.JOB_NAME} #${env.BUILD_NUMBER}
-          URL: ${env.BUILD_URL}
-          Duration: ${currentBuild.durationString}
-          Changes: ${currentBuild.changeSets}
-        """,
-        to: "rajeshgovindan777@gmail.com",   // your email or team emails
-        replyTo: "rajeshgovindan777@gmail.com",
+  post {
+    success {
+      emailext(
+        subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "Build succeeded!\nURL: ${env.BUILD_URL}",
+        to: "rajeshgovindan777@gmail.com",
         mimeType: "text/plain"
-    )
+      )
+    }
+    failure {
+      emailext(
+        subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "Build FAILED!\nURL: ${env.BUILD_URL}\nConsole: ${env.BUILD_URL}console",
+        to: "rajeshgovindan777@gmail.com",
+        attachLog: true,
+        compressLog: true
+      )
+    }
+    always {
+      sh 'docker image prune -f'
+    }
   }
-  failure {
-   emailext (
-      subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-      body: """
-        Build FAILED!
-        Job: ${env.JOB_NAME}
-        Build: #${env.BUILD_NUMBER}
-        URL: ${env.BUILD_URL}
-        Duration: ${currentBuild.durationString}
-        Console: ${env.BUILD_URL}console
-      """,
-      to: "rajeshgovindan777@gmail.com",
-      attachLog: true,   // attaches console log
-      compressLog: true
-    )
-  }
- }
 }
