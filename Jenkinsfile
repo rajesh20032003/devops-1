@@ -104,14 +104,14 @@ pipeline {
       agent {
         docker {
           image 'sonarsource/sonar-scanner-cli:latest'
-          args '--user root'   // optional: to avoid permission issues with mounted volumes
+          args '--entrypoint="" --user root'  // ← fix here
         }
       }
       environment {
         SONAR_TOKEN = credentials('sonar-token')
       }
       steps {
-        withSonarQubeEnv('Sonarqube') {  // 'SonarQube' must match the name in Jenkins global config
+        withSonarQubeEnv('Sonarqube') {
           sh '''
             sonar-scanner \
               -Dsonar.projectKey=micro-dash \
@@ -122,7 +122,7 @@ pipeline {
           '''
         }
       }
-    }
+}
     stage('Build Images') {
       parallel {
 
