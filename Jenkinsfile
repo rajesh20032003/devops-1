@@ -19,17 +19,14 @@ pipeline {
       parallel {
 
         stage('Gateway') {
-          agent { 
-            docker { 
-              image 'node:22-alpine'
-              args '-v jenkins-npm-cache:/root/.npm'  // ← npm cache volume
-            } 
-          }
+          agent { docker { image 'node:22-alpine' } }
           steps {
             dir('gateway') {
-              sh 'npm ci --prefer-offline --no-audit --cache /root/.npm'
+              
+              sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
+            
             }
           }
           post {
@@ -41,15 +38,10 @@ pipeline {
         }
 
         stage('User Service') {
-          agent { 
-            docker { 
-              image 'node:22-alpine'
-              args '-v jenkins-npm-cache:/root/.npm'  // ← shared npm cache
-            } 
-          }
+          agent { docker { image 'node:22-alpine' } }
           steps {
             dir('user-service') {
-              sh 'npm ci --prefer-offline --no-audit --cache /root/.npm'
+              sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
@@ -62,15 +54,10 @@ pipeline {
         }
 
         stage('Order Service') {
-          agent { 
-            docker { 
-              image 'node:22-alpine'
-              args '-v jenkins-npm-cache:/root/.npm'  // ← shared npm cache
-            } 
-          }
+          agent { docker { image 'node:22-alpine' } }
           steps {
             dir('order-service') {
-              sh 'npm ci --prefer-offline --no-audit --cache /root/.npm'
+              sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
@@ -83,15 +70,10 @@ pipeline {
         }
 
         stage('Frontend') {
-          agent { 
-            docker { 
-              image 'node:22-alpine'
-              args '-v jenkins-npm-cache:/root/.npm'  // ← shared npm cache
-            } 
-          }
+          agent { docker { image 'node:22-alpine' } }
           steps {
             dir('frontend') {
-              sh 'npm ci --prefer-offline --no-audit --cache /root/.npm'
+              sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint:html || true'
             }
           }
@@ -100,56 +82,54 @@ pipeline {
       }
     }
 
-    stage('SonarQube Analysis') {
-      agent any
-      environment {
-        SONAR_TOKEN = credentials('sonar-token')
-      }
-      steps {
-        withSonarQubeEnv('SonarQube') {
-          sh '''
-            docker run --rm \
-              -e SONAR_TOKEN=$SONAR_TOKEN \
-              -e SONAR_HOST_URL=http://34.14.148.93:9000 \
-              -v $(pwd):/usr/src \
-              sonarsource/sonar-scanner-cli:latest \
-              -Dsonar.projectKey=micro-dash \
-              -Dsonar.sources=. \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
-          '''
-        }
-      }
+ stage('SonarQube Analysis') {
+  agent any
+  environment {
+    SONAR_TOKEN = credentials('sonar-token')
+  }
+  steps {
+    withSonarQubeEnv('sonarqube') {
+      sh '''
+        docker run --rm \
+          -e SONAR_TOKEN=$SONAR_TOKEN \
+          -e SONAR_HOST_URL=http://34.14.148.93:9000 \
+          -v $(pwd):/usr/src \
+          sonarsource/sonar-scanner-cli:latest \
+          -Dsonar.projectKey=micro-dash \
+          -Dsonar.sources=. \
+          -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
+      '''
     }
-
+  }
+}
     stage('Build Images') {
       parallel {
 
         stage('Build Frontend') {
           agent any
           steps {
-            // ← BuildKit cache for faster layer reuse
-            sh "DOCKER_BUILDKIT=1 docker build --cache-from ${DOCKER_REGISTRY}/frontend:cache -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} ./frontend"
+            sh "docker build -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} ./frontend"
           }
         }
 
         stage('Build Gateway') {
           agent any
           steps {
-            sh "DOCKER_BUILDKIT=1 docker build --cache-from ${DOCKER_REGISTRY}/gateway:cache -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} ./gateway"
+            sh "docker build -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} ./gateway"
           }
         }
 
         stage('Build User Service') {
           agent any
           steps {
-            sh "DOCKER_BUILDKIT=1 docker build --cache-from ${DOCKER_REGISTRY}/user-service:cache -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} ./user-service"
+            sh "docker build -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} ./user-service"
           }
         }
 
         stage('Build Order Service') {
           agent any
           steps {
-            sh "DOCKER_BUILDKIT=1 docker build --cache-from ${DOCKER_REGISTRY}/order-service:cache -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} ./order-service"
+            sh "docker build -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} ./order-service"
           }
         }
 
@@ -159,20 +139,11 @@ pipeline {
     stage('Trivy Scan') {
       agent any
       steps {
-        // ← Cache Trivy DB so it doesn't re-download every build
         sh '''
-          trivy image --exit-code 1 --no-progress --severity CRITICAL \
-            --cache-dir /tmp/trivy-cache \
-            ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity CRITICAL \
-            --cache-dir /tmp/trivy-cache \
-            ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity CRITICAL \
-            --cache-dir /tmp/trivy-cache \
-            ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity CRITICAL \
-            --cache-dir /tmp/trivy-cache \
-            ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
         '''
       }
     }
@@ -187,12 +158,6 @@ pipeline {
             docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push()
             docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push()
             docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push()
-
-            // ← Push cache tags for next build's --cache-from
-            docker.image("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}").push('cache')
-            docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push('cache')
-            docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push('cache')
-            docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push('cache')
           }
         }
       }
@@ -215,6 +180,7 @@ pipeline {
         to: "rajeshgovindan777@gmail.com"
       )
     }
+
     failure {
       emailext(
         subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
