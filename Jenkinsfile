@@ -115,7 +115,7 @@ pipeline {
 
   post {
     always {
-       node {
+       script {
          sh 'docker image prune -f'
     }
     }
