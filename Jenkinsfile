@@ -42,11 +42,10 @@ pipeline {
             }
           }
           post {
-            always {
-              junit allowEmptyResults: true, testResults: 'user-service/coverage/junit.xml'
-              recordCoverage tools: [[pattern: 'user-service/coverage/cobertura-coverage.xml']]
-            }
+           always {
+             junit '**/junit.xml'
           }
+         }
         }
 
         stage('Order Service') {
@@ -59,11 +58,10 @@ pipeline {
             }
           }
           post {
-            always {
-              junit allowEmptyResults: true, testResults: 'order-service/coverage/junit.xml'
-              recordCoverage tools: [[pattern: 'order-service/coverage/cobertura-coverage.xml']]
-            }
+           always {
+            junit '**/junit.xml'
           }
+         }
         }
 
         stage('Frontend') {
@@ -76,12 +74,11 @@ pipeline {
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
           }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: 'frontend/coverage/junit.xml'
-              recordCoverage tools: [[pattern: 'frontend/coverage/cobertura-coverage.xml']]
-            }
+         post {
+          always {
+            junit '**/junit.xml'
           }
+         }
         }
       }
     }
