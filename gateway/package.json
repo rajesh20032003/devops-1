@@ -12,6 +12,9 @@
     "test:watch": "jest --watch --coverage",
     "lint": "eslint ."
   },
+  "jest": {
+  "reporters": ["default", "jest-junit"]
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -23,6 +26,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "globals": "^17.3.0",
     "jest": "^30.2.0",
+    "jest-junit": "^16.0.0",
     "prettier": "^3.8.1",
     "supertest": "^7.2.2"
   },

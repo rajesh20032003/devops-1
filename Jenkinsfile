@@ -27,6 +27,18 @@ pipeline {
                 sh 'npm test'
               }
             }
+          post {
+            always {
+            // Publish JUnit test results (shows pass/fail in Jenkins UI)
+            junit allowEmptyResults: true, testResults: 'gateway/test-results/**/*.xml'
+            
+            // Publish coverage (if using Cobertura XML format)
+            recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
+            
+            // Optional: archive coverage report for download
+            archiveArtifacts artifacts: 'gateway/coverage/**', allowEmptyArchive: true
+          }
+        }
           }
           stage('user service tests') {
             agent { docker {image 'node:22'}}
@@ -37,6 +49,18 @@ pipeline {
                 sh 'npm test'
               }
             }
+            post {
+              always {
+            // Publish JUnit test results (shows pass/fail in Jenkins UI)
+            junit allowEmptyResults: true, testResults: 'gateway/test-results/**/*.xml'
+            
+            // Publish coverage (if using Cobertura XML format)
+            recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
+            
+            // Optional: archive coverage report for download
+            archiveArtifacts artifacts: 'gateway/coverage/**', allowEmptyArchive: true
+          }
+        }
           }
           stage('order service tests') {
             agent { docker {image 'node:22'}}
@@ -47,6 +71,18 @@ pipeline {
                 sh 'npm test'
               }
             }
+            post {
+              always {
+            // Publish JUnit test results (shows pass/fail in Jenkins UI)
+            junit allowEmptyResults: true, testResults: 'gateway/test-results/**/*.xml'
+            
+            // Publish coverage (if using Cobertura XML format)
+            recordCoverage tools: [[pattern: 'gateway/coverage/cobertura-coverage.xml']]
+            
+            // Optional: archive coverage report for download
+            archiveArtifacts artifacts: 'gateway/coverage/**', allowEmptyArchive: true
+          }
+        }
           }
           stage('frontend service tests') {
             agent { docker {image 'node:22'}}
@@ -57,6 +93,8 @@ pipeline {
                 sh 'npm test || true'
               }
             }
+           
+        
           }
         }
       }
@@ -146,13 +184,36 @@ pipeline {
     }
   }
 
-  post {
-    success {
-      echo "All images built & pushed successfully!"
-    }
-
-    failure {
-      echo "Build failed!"
-    }
+post {
+  success {
+    emailext(
+      subject: "Jenkins Build: ${currentBuild.currentResult} - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: """
+          Build ${currentBuild.currentResult}: ${env.JOB_NAME} #${env.BUILD_NUMBER}
+          URL: ${env.BUILD_URL}
+          Duration: ${currentBuild.durationString}
+          Changes: ${currentBuild.changeSets}
+        """,
+        to: "rajeshgovindan777@gmail.com",   // your email or team emails
+        replyTo: "rajeshgovindan777@gmail.com",
+        mimeType: "text/plain"
+    )
   }
+  failure {
+   emailext (
+      subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+      body: """
+        Build FAILED!
+        Job: ${env.JOB_NAME}
+        Build: #${env.BUILD_NUMBER}
+        URL: ${env.BUILD_URL}
+        Duration: ${currentBuild.durationString}
+        Console: ${env.BUILD_URL}console
+      """,
+      to: "rajeshgovindan777@gmail.com",
+      attachLog: true,   // attaches console log
+      compressLog: true
+    )
+  }
+ }
 }
