@@ -74,8 +74,8 @@ pipeline {
             sonar-scanner \
              -Dsonar.projectKey=micro-dash \
              -Dsonar.sources=. \
-             -Dsonar.host.url=http://sonarqube:9000 \
-             -Dsonar.login=$SONAR_TOKEN
+             -Dsonar.host.url=http://34.14.148.93:9000 \
+             -Dsonar.token=$SONAR_TOKEN
              '''
         }
       }
