@@ -111,7 +111,7 @@ pipeline {
         SONAR_TOKEN = credentials('sonar-token')
       }
       steps {
-        withSonarQubeEnv('SonarQube') {  // 'SonarQube' must match the name in Jenkins global config
+        withSonarQubeEnv('Sonarqube') {  // 'SonarQube' must match the name in Jenkins global config
           sh '''
             sonar-scanner \
               -Dsonar.projectKey=micro-dash \
