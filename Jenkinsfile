@@ -3,13 +3,14 @@ pipeline {
 
   environment {
     DOCKER_REGISTRY = "rajesh00007"
-    IMAGE_TAG       = "${env.BUILD_NUMBER}"
+    IMAGE_TAG       = "${env.GIT_COMMIT.take(7)}"
   }
 
   options {
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '10'))
     timeout(time: 45, unit: 'MINUTES')
+    timestamps()
   }
 
   stages {
@@ -59,7 +60,7 @@ pipeline {
           }
           post {
            always {
-            junit '**/junit.xml'
+             junit '**/junit.xml'
           }
          }
         }
@@ -74,11 +75,6 @@ pipeline {
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
           }
-         post {
-          always {
-            junit '**/junit.xml'
-          }
-         }
         }
       }
     }
