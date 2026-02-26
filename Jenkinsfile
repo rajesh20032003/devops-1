@@ -81,8 +81,7 @@ pipeline {
       }
     }
     
-    stage('Build All Services in Parallel') {
-      agent any 
+    stage('Build All Services in Parallel') { 
       parallel {
         stage('Build Frontend') {
           steps {
