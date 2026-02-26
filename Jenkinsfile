@@ -51,7 +51,7 @@ pipeline {
           stage('frontend service tests') {
             agent { docker {image 'node:22'}}
             steps {
-              dir('user-service') {
+              dir('frontend') {
                 sh 'npm ci'
                 sh 'npm run lint:html || true'
                 sh 'npm test || true'
@@ -82,6 +82,7 @@ pipeline {
     }
     
     stage('Build All Services in Parallel') {
+      agent any 
       parallel {
         stage('Build Frontend') {
           steps {
@@ -119,6 +120,7 @@ pipeline {
 
 //trivy scan
     stage('trivy scan images'){
+      agent any
       steps{
         sh '''
         trivy image --severity CRITICAL --exit-code 1 ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
@@ -146,8 +148,6 @@ pipeline {
   }
 
   post {
-  
-
     success {
       echo "All images built & pushed successfully!"
     }
