@@ -154,7 +154,7 @@ pipeline {
   }
 
   post {
-    agent any
+    //agent any
     success {
       emailext(
         subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
@@ -173,7 +173,9 @@ pipeline {
       )
     }
     always {
+      node {
       sh 'docker image prune -f'
+      }
     }
   }
 }
