@@ -17,4 +17,4 @@ FROM gcr.io/distroless/nodejs22-debian12
 COPY --from=build /app /app
 WORKDIR /app
 USER nonroot
-CMD ["app.js"]
+CMD ["server.js"]
