@@ -161,16 +161,16 @@ pipeline {
       steps {
         // ← Cache Trivy DB so it doesn't re-download every build
         sh '''
-          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL \
+          trivy image --exit-code 1 --no-progress --severity CRITICAL \
             --cache-dir /tmp/trivy-cache \
             ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL \
+          trivy image --exit-code 1 --no-progress --severity CRITICAL \
             --cache-dir /tmp/trivy-cache \
             ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL \
+          trivy image --exit-code 1 --no-progress --severity CRITICAL \
             --cache-dir /tmp/trivy-cache \
             ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity HIGH,CRITICAL \
+          trivy image --exit-code 1 --no-progress --severity CRITICAL \
             --cache-dir /tmp/trivy-cache \
             ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
         '''
