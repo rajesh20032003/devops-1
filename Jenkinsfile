@@ -22,11 +22,11 @@ pipeline {
           agent { docker { image 'node:22-alpine' } }
           steps {
             dir('gateway') {
-              cache(path: 'node_modules', key: "npm-gateway-${hashFiles('package-lock.json')}") {
+              
               sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
-            }
+            
             }
           }
           post {
