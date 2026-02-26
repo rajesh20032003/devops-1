@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     DOCKER_REGISTRY = "rajesh00007"
-    IMAGE_TAG = "${env.GIT_COMMIT?.take(7) ?: env.BUILD_NUMBER}"
+    IMAGE_TAG = "${BUILD_NUMBER}"
   }
 
   options {
