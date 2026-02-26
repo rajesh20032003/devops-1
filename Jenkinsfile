@@ -92,8 +92,7 @@ pipeline {
               -Dsonar.projectKey=micro-dash \
               -Dsonar.sources=. \
               -Dsonar.host.url=http://34.14.148.93:9000 \
-              -Dsonar.token=$SONAR_TOKEN \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
+              -Dsonar.token=$SONAR_TOKEN  
           '''
         }
       }
