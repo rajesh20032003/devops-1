@@ -100,25 +100,22 @@ pipeline {
     //     }
     //   }
     // }
-  stage('SonarQube Analysis') {
-  agent {
-    docker {
-      image 'sonarsource/sonar-scanner-cli:latest'
-      args '--entrypoint=""'
-    }
-  }
+ stage('SonarQube Analysis') {
+  agent any
   environment {
     SONAR_TOKEN = credentials('sonar-token')
   }
   steps {
     withSonarQubeEnv('Sonarqube') {
       sh '''
-        sonar-scanner \
+        docker run --rm \
+          -e SONAR_TOKEN=$SONAR_TOKEN \
+          -e SONAR_HOST_URL=http://34.14.148.93:9000 \
+          -v $(pwd):/usr/src \
+          sonarsource/sonar-scanner-cli:latest \
           -Dsonar.projectKey=micro-dash \
           -Dsonar.sources=. \
-          -Dsonar.host.url=http://34.14.148.93:9000 \
-          -Dsonar.token=$SONAR_TOKEN \
-          -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
+          -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
       '''
     }
   }
