@@ -22,9 +22,11 @@ pipeline {
           agent { docker { image 'node:22-alpine' } }
           steps {
             dir('gateway') {
+              cache(path: 'node_modules', key: "npm-gateway-${hashFiles('package-lock.json')}") {
               sh 'npm ci --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
+            }
             }
           }
           post {
@@ -100,20 +102,23 @@ pipeline {
     // }
   stage('SonarQube Analysis') {
       agent {
-        docker { image 'sonarsource/sonar-scanner-cli:latest' }
+        docker {
+          image 'sonarsource/sonar-scanner-cli:latest'
+          args '--user root'   // optional: to avoid permission issues with mounted volumes
+        }
       }
       environment {
         SONAR_TOKEN = credentials('sonar-token')
       }
       steps {
-        withSonarQubeEnv('SonarQube') {
+        withSonarQubeEnv('SonarQube') {  // 'SonarQube' must match the name in Jenkins global config
           sh '''
             sonar-scanner \
               -Dsonar.projectKey=micro-dash \
               -Dsonar.sources=. \
               -Dsonar.host.url=http://34.14.148.93:9000 \
               -Dsonar.token=$SONAR_TOKEN \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
+              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
           '''
         }
       }
