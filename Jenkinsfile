@@ -218,6 +218,7 @@ pipeline {
     stage('Cleanup') {
       agent any
       steps {
+        cleanWs()
         sh 'docker image prune -f || true'
       }
     }
