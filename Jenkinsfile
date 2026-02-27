@@ -26,11 +26,12 @@ pipeline {
            } }
           steps {
             dir('gateway') {
-              cache(
-                  path: 'node_modules',
-                  key: "npm-gateway-${hashFiles('package-lock.json')}",
-                  cacheInvalidatedOnChange: true
-                ){
+             cache(maxCacheSize: 250, caches: [
+              arbitraryFileCache(
+                path: 'gateway/node_modules',
+                cacheValidityDecidingFile: 'package-lock.json'
+              )
+            ]){
               sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
@@ -54,11 +55,12 @@ pipeline {
            } }
           steps {
             dir('user-service') {
-              cache(
-                  path: 'node_modules',
-                  key: "npm-gateway-${hashFiles('package-lock.json')}",
-                  cacheInvalidatedOnChange: true
-                ){
+              cache(maxCacheSize: 250, caches: [
+              arbitraryFileCache(
+                path: 'user-service/node_modules',
+                cacheValidityDecidingFile: 'package-lock.json'
+              )
+            ]){
               sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
@@ -80,11 +82,12 @@ pipeline {
            } }
           steps {
             dir('order-service') {
-               cache(
-                  path: 'node_modules',
-                  key: "npm-gateway-${hashFiles('package-lock.json')}",
-                  cacheInvalidatedOnChange: true
-                ){
+              cache(maxCacheSize: 250, caches: [
+              arbitraryFileCache(
+                path: 'order-service/node_modules',
+                cacheValidityDecidingFile: 'package-lock.json'
+              )
+            ]){
               sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
@@ -106,11 +109,12 @@ pipeline {
            } }
           steps {
             dir('frontend') {
-               cache(
-                  path: 'node_modules',
-                  key: "npm-gateway-${hashFiles('package-lock.json')}",
-                  cacheInvalidatedOnChange: true
-                ){
+               cache(maxCacheSize: 250, caches: [
+              arbitraryFileCache(
+                path: 'frontend/node_modules',
+                cacheValidityDecidingFile: 'package-lock.json'
+              )
+            ]){
               sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint:html || true'
                 }
