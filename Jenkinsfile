@@ -22,14 +22,19 @@ pipeline {
           agent { 
             docker {
              image 'node:22-alpine'
-             args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
+             //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('gateway') {
-              
-              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
+              cache(
+                  path: 'node_modules',
+                  key: "npm-gateway-${hashFiles('package-lock.json')}",
+                  cacheInvalidatedOnChange: true
+                ){
+              sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
+                }
             
             }
           }
@@ -45,13 +50,19 @@ pipeline {
             agent { 
               docker {
                 image 'node:22-alpine'
-                args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
+                //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('user-service') {
-              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
+              cache(
+                  path: 'node_modules',
+                  key: "npm-gateway-${hashFiles('package-lock.json')}",
+                  cacheInvalidatedOnChange: true
+                ){
+              sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
+                }
             }
           }
           post {
@@ -65,13 +76,19 @@ pipeline {
            agent { 
              docker {
               image 'node:22-alpine'
-              args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
+              //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('order-service') {
-              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
+               cache(
+                  path: 'node_modules',
+                  key: "npm-gateway-${hashFiles('package-lock.json')}",
+                  cacheInvalidatedOnChange: true
+                ){
+              sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
+                }
             }
           }
           post {
@@ -85,12 +102,18 @@ pipeline {
            agent { 
               docker {
               image 'node:22-alpine'
-              args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
+              //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('frontend') {
-              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
+               cache(
+                  path: 'node_modules',
+                  key: "npm-gateway-${hashFiles('package-lock.json')}",
+                  cacheInvalidatedOnChange: true
+                ){
+              sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint:html || true'
+                }
             }
           }
         }
