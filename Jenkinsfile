@@ -92,7 +92,7 @@ pipeline {
       sh '''
         docker run --rm \
           -e SONAR_TOKEN=$SONAR_TOKEN \
-          -e SONAR_HOST_URL=http://34.14.148.93:9000 \
+          -e SONAR_HOST_URL=http://34.47.167.36:9000 \
           -v $(pwd):/usr/src \
           sonarsource/sonar-scanner-cli:latest \
           -Dsonar.projectKey=micro-dash \
