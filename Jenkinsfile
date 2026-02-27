@@ -228,7 +228,7 @@ pipeline {
     }
 
     stage('Push Images') {
-      when { branch 'main' }
+      when { branch 'master' }
       agent any
       steps {
         script {
