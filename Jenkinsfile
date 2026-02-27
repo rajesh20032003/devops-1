@@ -137,10 +137,7 @@ pipeline {
           -e SONAR_TOKEN=$SONAR_TOKEN \
           -e SONAR_HOST_URL=http://35.200.201.42:9000 \
           -v $(pwd):/usr/src \
-          sonarsource/sonar-scanner-cli:latest \
-          -Dsonar.projectKey=micro-dash \
-          -Dsonar.sources=. \
-          -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
+          sonarsource/sonar-scanner-cli:latest
       '''
     }
   }
