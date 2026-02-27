@@ -140,6 +140,7 @@ pipeline {
           sonarsource/sonar-scanner-cli:latest \
           -Dsonar.projectKey=micro-dash \
           -Dsonar.sources=. \
+          -Dsonar.branch.name=${BRANCH_NAME}
           -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
       '''
     }
