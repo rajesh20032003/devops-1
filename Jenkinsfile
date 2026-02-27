@@ -19,11 +19,15 @@ pipeline {
       parallel {
 
         stage('Gateway') {
-          agent { docker { image 'node:22-alpine' } }
+          agent { 
+            docker {
+             image 'node:22-alpine'
+             args '-v $HOME/.npm:/root/.npm'
+           } }
           steps {
             dir('gateway') {
               
-              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             
@@ -38,10 +42,14 @@ pipeline {
         }
 
         stage('User Service') {
-          agent { docker { image 'node:22-alpine' } }
+            agent { 
+              docker {
+                image 'node:22-alpine'
+                args '-v $HOME/.npm:/root/.npm'
+           } }
           steps {
             dir('user-service') {
-              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
@@ -54,10 +62,14 @@ pipeline {
         }
 
         stage('Order Service') {
-          agent { docker { image 'node:22-alpine' } }
+           agent { 
+             docker {
+              image 'node:22-alpine'
+              args '-v $HOME/.npm:/root/.npm'
+           } }
           steps {
             dir('order-service') {
-              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
@@ -70,10 +82,14 @@ pipeline {
         }
 
         stage('Frontend') {
-          agent { docker { image 'node:22-alpine' } }
+           agent { 
+              docker {
+              image 'node:22-alpine'
+              args '-v $HOME/.npm:/root/.npm'
+           } }
           steps {
             dir('frontend') {
-              sh 'npm ci --prefer-offline --no-audit'
+              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
               sh 'npm run lint:html || true'
             }
           }
@@ -108,28 +124,60 @@ pipeline {
         stage('Build Frontend') {
           agent any
           steps {
-            sh "docker build -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} ./frontend"
+            sh """
+              docker pull ${DOCKER_REGISTRY}/frontend:latest || true
+
+              docker build \
+                --cache-from ${DOCKER_REGISTRY}/frontend:latest \
+                -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} \
+                -t ${DOCKER_REGISTRY}/frontend:latest \
+                ./frontend
+              """
           }
         }
 
         stage('Build Gateway') {
           agent any
           steps {
-            sh "docker build -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} ./gateway"
+            sh """
+              docker pull ${DOCKER_REGISTRY}/gateway:latest || true
+
+              docker build \
+                --cache-from ${DOCKER_REGISTRY}/gateway:latest \
+                -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} \
+                -t ${DOCKER_REGISTRY}/gateway:latest \
+                ./gateway
+              """
           }
         }
 
         stage('Build User Service') {
           agent any
           steps {
-            sh "docker build -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} ./user-service"
+            sh """
+              docker pull ${DOCKER_REGISTRY}/user-service:latest || true
+
+              docker build \
+                --cache-from ${DOCKER_REGISTRY}/user-service:latest \
+                -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} \
+                -t ${DOCKER_REGISTRY}/user-service:latest \
+                ./user-service
+              """
           }
         }
 
         stage('Build Order Service') {
           agent any
           steps {
-            sh "docker build -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} ./order-service"
+           sh """
+              docker pull ${DOCKER_REGISTRY}/order-service:latest || true
+
+              docker build \
+                --cache-from ${DOCKER_REGISTRY}/order-service:latest \
+                -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} \
+                -t ${DOCKER_REGISTRY}/order-service:latest \
+                ./order-service
+              """
           }
         }
 
@@ -140,11 +188,15 @@ pipeline {
       agent any
       steps {
         sh '''
-          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-          trivy image --exit-code 1 --no-progress --severity CRITICAL ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
-        '''
+            export TRIVY_CACHE_DIR=$HOME/.trivy
+
+            trivy image --download-db-only
+
+            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
+            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
+            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
+            '''
       }
     }
 
