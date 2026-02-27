@@ -228,7 +228,7 @@ pipeline {
   post {
     success {
       emailext(
-        subject: "SUCCESS!!!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        subject: "SUCCESS!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body: "Build succeeded!\nURL: ${env.BUILD_URL}",
         to: "rajeshgovindan777@gmail.com"
       )
@@ -236,7 +236,7 @@ pipeline {
 
     failure {
       emailext(
-        subject: "FAILED!!!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        subject: "FAILED!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body: "Build FAILED!\nURL: ${env.BUILD_URL}\nConsole: ${env.BUILD_URL}console",
         to: "rajeshgovindan777@gmail.com",
         attachLog: true,
