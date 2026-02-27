@@ -22,12 +22,12 @@ pipeline {
           agent { 
             docker {
              image 'node:22-alpine'
-             args '-v $HOME/.npm:/root/.npm'
+             args '-v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('gateway') {
               
-              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
+              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             
@@ -45,11 +45,11 @@ pipeline {
             agent { 
               docker {
                 image 'node:22-alpine'
-                args '-v $HOME/.npm:/root/.npm'
+                args '-v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('user-service') {
-              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
+              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
@@ -65,11 +65,11 @@ pipeline {
            agent { 
              docker {
               image 'node:22-alpine'
-              args '-v $HOME/.npm:/root/.npm'
+              args '-v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('order-service') {
-              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
+              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
             }
@@ -85,11 +85,11 @@ pipeline {
            agent { 
               docker {
               image 'node:22-alpine'
-              args '-v $HOME/.npm:/root/.npm'
+              args '-v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('frontend') {
-              sh 'npm ci --cache /root/.npm --prefer-offline --no-audit'
+              sh 'npm ci --cache /home/node/.npm --prefer-offline --no-audit'
               sh 'npm run lint:html || true'
             }
           }
