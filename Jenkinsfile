@@ -22,7 +22,7 @@ pipeline {
           agent { 
             docker {
              image 'node:22-alpine'
-             args '-v $HOME/.npm:/home/node/.npm'
+             args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('gateway') {
@@ -45,7 +45,7 @@ pipeline {
             agent { 
               docker {
                 image 'node:22-alpine'
-                args '-v $HOME/.npm:/home/node/.npm'
+                args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('user-service') {
@@ -65,7 +65,7 @@ pipeline {
            agent { 
              docker {
               image 'node:22-alpine'
-              args '-v $HOME/.npm:/home/node/.npm'
+              args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('order-service') {
@@ -85,7 +85,7 @@ pipeline {
            agent { 
               docker {
               image 'node:22-alpine'
-              args '-v $HOME/.npm:/home/node/.npm'
+              args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
            } }
           steps {
             dir('frontend') {
