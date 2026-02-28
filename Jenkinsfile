@@ -16,118 +16,91 @@ pipeline {
   stages {
 
     stage('Quality Checks') {
-      parallel {
+  parallel {
 
-        stage('Gateway') {
-          agent { 
-            docker {
-             image 'node:22-alpine'
-             //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
-           } }
-          steps {
-            dir('gateway') {
-             cache(maxCacheSize: 250, caches: [
-              arbitraryFileCache(
-                path: 'gateway/node_modules',
-                cacheValidityDecidingFile: 'package-lock.json'
-              )
-            ]){
-              
-              sh 'npm ci  --prefer-offline --no-audit'
-              sh 'npm run lint'
-              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
-            
-                }
-            
-            }
-          }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: 'gateway/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
-            }
-          }
+    stage('Gateway') {
+      agent {
+        docker {
+          image 'node:22-alpine'
+          args '-v npm-cache-gateway:/home/node/.npm'  // ← persistent named volume
         }
-
-        stage('User Service') {
-            agent { 
-              docker {
-                image 'node:22-alpine'
-                //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
-           } }
-          steps {
-            dir('user-service') {
-              cache(maxCacheSize: 250, caches: [
-              arbitraryFileCache(
-                path: 'user-service/node_modules',
-                cacheValidityDecidingFile: 'package-lock.json'
-              )
-            ]){
-              sh 'npm ci  --prefer-offline --no-audit'
-              sh 'npm run lint'
-              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
-                }
-            }
-          }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: '**/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'user-service/coverage/lcov.info']]
-            }
-          }
+      }
+      steps {
+        dir('gateway') {
+          sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
+          sh 'npm run lint'
+          sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
         }
-
-        stage('Order Service') {
-           agent { 
-             docker {
-              image 'node:22-alpine'
-              //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
-           } }
-          steps {
-            dir('order-service') {
-              cache(maxCacheSize: 250, caches: [
-              arbitraryFileCache(
-                path: 'order-service/node_modules',
-                cacheValidityDecidingFile: 'package-lock.json'
-              )
-            ]){
-              sh 'npm ci  --prefer-offline --no-audit'
-              sh 'npm run lint'
-              sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
-                }
-            }
-          }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: '**/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'order-service/coverage/lcov.info']]
-            }
-          }
+      }
+      post {
+        always {
+          junit allowEmptyResults: true, testResults: 'gateway/coverage/junit.xml'
+          recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
         }
-
-        stage('Frontend') {
-           agent { 
-              docker {
-              image 'node:22-alpine'
-              //args '-u 1000:1000 -v $HOME/.npm:/home/node/.npm'
-           } }
-          steps {
-            dir('frontend') {
-               cache(maxCacheSize: 250, caches: [
-              arbitraryFileCache(
-                path: 'frontend/node_modules',
-                cacheValidityDecidingFile: 'package-lock.json'
-              )
-            ]){
-              sh 'npm ci  --prefer-offline --no-audit'
-              sh 'npm run lint:html || true'
-                }
-            }
-          }
-        }
-
       }
     }
+
+    stage('User Service') {
+      agent {
+        docker {
+          image 'node:22-alpine'
+          args '-v npm-cache-user-service:/home/node/.npm'  // ← separate volume per service
+        }
+      }
+      steps {
+        dir('user-service') {
+          sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
+          sh 'npm run lint'
+          sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
+        }
+      }
+      post {
+        always {
+          junit allowEmptyResults: true, testResults: 'user-service/coverage/junit.xml'
+          recordCoverage tools: [[parser: 'LCOV', pattern: 'user-service/coverage/lcov.info']]
+        }
+      }
+    }
+
+    stage('Order Service') {
+      agent {
+        docker {
+          image 'node:22-alpine'
+          args '-v npm-cache-order-service:/home/node/.npm'
+        }
+      }
+      steps {
+        dir('order-service') {
+          sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
+          sh 'npm run lint'
+          sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
+        }
+      }
+      post {
+        always {
+          junit allowEmptyResults: true, testResults: 'order-service/coverage/junit.xml'
+          recordCoverage tools: [[parser: 'LCOV', pattern: 'order-service/coverage/lcov.info']]
+        }
+      }
+    }
+
+    stage('Frontend') {
+      agent {
+        docker {
+          image 'node:22-alpine'
+          args '-v npm-cache-frontend:/home/node/.npm'
+        }
+      }
+      steps {
+        dir('frontend') {
+          sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
+          sh 'npm run lint:html || true'
+        }
+      }
+    }
+
+  }
+}
 
  stage('SonarQube Analysis') {
   agent any
@@ -228,15 +201,14 @@ pipeline {
       agent any
       steps {
         sh '''
-            export TRIVY_CACHE_DIR=$HOME/.trivy
+          export TRIVY_CACHE_DIR=$HOME/.trivy
+          trivy image --download-db-only --cache-dir $HOME/.trivy
 
-            trivy image --download-db-only
-
-            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
-            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
-            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-            trivy image --exit-code 1 --severity CRITICAL ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
-            '''
+          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
+          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
+          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
+          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
+        '''
       }
     }
 
