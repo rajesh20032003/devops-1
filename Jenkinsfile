@@ -127,7 +127,7 @@ pipeline {
       }
     }
 
- stage('SonarQube Analysis') {
+ stage('SonarQube Analysis!') {
   agent any
   environment {
     SONAR_TOKEN = credentials('sonar-token')
