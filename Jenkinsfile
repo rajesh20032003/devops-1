@@ -72,7 +72,7 @@ pipeline {
           post {
             always {
               junit allowEmptyResults: true, testResults: '**/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
+              recordCoverage tools: [[parser: 'LCOV', pattern: 'user/coverage/lcov.info']]
             }
           }
         }
@@ -100,7 +100,7 @@ pipeline {
           post {
             always {
               junit allowEmptyResults: true, testResults: '**/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
+              recordCoverage tools: [[parser: 'LCOV', pattern: 'order/coverage/lcov.info']]
             }
           }
         }
