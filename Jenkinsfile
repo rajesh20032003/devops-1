@@ -133,7 +133,6 @@ pipeline {
   environment {
     SONAR_TOKEN = credentials('sonar-token')
   }
-  parallel{
   steps {
     withSonarQubeEnv('sonarqube') {
       sh '''
@@ -152,7 +151,7 @@ pipeline {
           -Dsonar.scm.provider=git
       '''
     }
-  }
+  
   }
 }
     stage('Build Images') {
