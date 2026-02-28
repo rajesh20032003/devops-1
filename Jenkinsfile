@@ -128,8 +128,9 @@ pipeline {
     }
 
  stage('SonarQube Analysis!') {
-  parallel{
+ 
   agent any
+   parallel{
   environment {
     SONAR_TOKEN = credentials('sonar-token')
   }
