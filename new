@@ -1,0 +1,46 @@
+2️⃣ Dynamic Pipeline for Microservices
+
+Right now pipeline builds everything.
+
+Make it smarter:
+
+✔ Detect changed service
+✔ Build only that service
+✔ Tag & deploy only that container
+
+👉 This is how large microservice platforms work.
+
+🔹 3️⃣ Advanced Quality Gates (Enterprise Practice)
+
+You already have Sonar.
+
+Take it further:
+
+✅ Fail build if:
+
+code coverage < threshold
+
+critical vulnerabilities found
+
+duplicated code > threshold
+
+👉 This enforces engineering discipline.
+🔹 4️⃣ DevSecOps Enhancement 🔐
+
+Take security scanning deeper:
+
+✔ Add SAST scan (Semgrep / CodeQL)
+✔ Secrets detection (GitLeaks / TruffleHog)
+✔ Dependency vulnerability scanning
+✔ SBOM generation (Syft)
+
+👉 Security-first pipelines are HOT in hiring.
+5️⃣ Artifact Management (Real Enterprise Pattern)
+
+Instead of only DockerHub:
+
+✔ Store artifacts in Nexus / Artifactory
+✔ Versioned builds
+✔ Traceability between build → artifact → deployment
+
+👉 This shows release engineering maturity

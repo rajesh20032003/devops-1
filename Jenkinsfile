@@ -32,11 +32,11 @@ pipeline {
                 cacheValidityDecidingFile: 'package-lock.json'
               )
             ]){
-              parallel{
+              
               sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
-            }
+            
                 }
             
             }
@@ -142,7 +142,7 @@ pipeline {
           sonarsource/sonar-scanner-cli \
           -Dsonar.projectKey=micro-dash \
           -Dsonar.projectName="Microservices Dashboard" \
-          -Dsonar.sources=. \
+          -Dsonar.sources=gateway,user-service,order-service,frontend \
           -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/** \
           -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info
         '''
