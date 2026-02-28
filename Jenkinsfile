@@ -221,7 +221,6 @@ pipeline {
 
     stage('Push Images') {
       when { branch 'main' }   // still conditional on main/master branch
-      agent any
       parallel {
         stage('Push Frontend') {
           steps {
