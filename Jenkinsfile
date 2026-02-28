@@ -135,16 +135,20 @@ pipeline {
   }
   steps {
     withSonarQubeEnv('sonarqube') {
-      sh '''
-        docker run --rm \
-          -e SONAR_TOKEN=$SONAR_TOKEN \
-          -e SONAR_HOST_URL=http://35.200.201.42:9000 \
-          -v $WORKSPACE:/usr/src \
-          sonarsource/sonar-scanner-cli:latest \
-          -Dsonar.projectBaseDir=/usr/src \
-          -Dsonar.projectKey=micro-dash \
-          -Dsonar.scm.disabled=true
-      '''
+     sh '''
+  docker run --rm \
+    -e SONAR_TOKEN=$SONAR_TOKEN \
+    -e SONAR_HOST_URL=http://35.200.201.42:9000 \
+    -v $WORKSPACE:/usr/src \
+    sonarsource/sonar-scanner-cli:latest \
+    -Dsonar.projectBaseDir=/usr/src \
+    -Dsonar.projectKey=micro-dash \
+    -Dsonar.projectName="Microservices Dashboard" \
+    -Dsonar.sources=gateway,user-service,order-service,frontend \
+    -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/** \
+    -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info \
+    -Dsonar.scm.disabled=true
+'''
     }
   
   }
