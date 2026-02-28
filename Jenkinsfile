@@ -32,9 +32,11 @@ pipeline {
                 cacheValidityDecidingFile: 'package-lock.json'
               )
             ]){
+              parallel{
               sh 'npm ci  --prefer-offline --no-audit'
               sh 'npm run lint'
               sh 'npm test -- --coverage --ci --reporters=default --reporters=jest-junit'
+            }
                 }
             
             }
