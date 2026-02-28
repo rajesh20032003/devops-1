@@ -220,19 +220,54 @@ pipeline {
     }
 
     stage('Push Images') {
-      when { branch 'main' }
+      when { branch 'main' }   // still conditional on main/master branch
       agent any
+      parallel {
+        stage('Push Frontend') {
+          steps {
+            script {
+              docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                docker.image("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}").push()
+                // docker.image("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}").push('latest')  // optional latest tag
+              }
+            }
+      }
+    }
+
+    stage('Push Gateway') {
       steps {
         script {
           docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-            docker.image("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}").push()
             docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push()
-            docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push()
-            docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push()
+            // docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push('latest')
           }
         }
       }
     }
+
+    stage('Push User Service') {
+      steps {
+        script {
+          docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+            docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push()
+            // docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push('latest')
+          }
+        }
+      }
+    }
+
+    stage('Push Order Service') {
+      steps {
+        script {
+          docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+            docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push()
+            // docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push('latest')
+          }
+        }
+      }
+    }
+  }
+}
 
     stage('Cleanup') {
       agent any
