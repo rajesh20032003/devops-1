@@ -141,13 +141,7 @@ pipeline {
           -e SONAR_HOST_URL=http://35.200.201.42:9000 \
           -v $WORKSPACE:/usr/src \
           sonarsource/sonar-scanner-cli:latest \
-          -Dsonar.projectKey=micro-dash \
-          -Dsonar.projectName="Microservices Dashboard" \
           -Dsonar.projectBaseDir=/usr/src \
-          -Dsonar.sources=/usr/src \
-          -Dsonar.inclusions=**/*.js,**/*.ts,**/*.tsx \
-          -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/** \
-          -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info,frontend/coverage/lcov.info \
           -Dsonar.scm.disabled=true
       '''
     }
