@@ -142,6 +142,7 @@ pipeline {
           -v $WORKSPACE:/usr/src \
           sonarsource/sonar-scanner-cli:latest \
           -Dsonar.projectBaseDir=/usr/src \
+          -Dsonar.projectKey=micro-dash \
           -Dsonar.scm.disabled=true
       '''
     }
