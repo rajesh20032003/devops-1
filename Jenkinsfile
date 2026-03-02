@@ -164,7 +164,6 @@ pipeline {
       steps {
         withSonarQubeEnv('sonarqube') {
           sh '''
-            # ✅ Clean and recreate with open permissions
             rm -rf $WORKSPACE/.scannerwork
             mkdir -p $WORKSPACE/.scannerwork
             chmod 777 $WORKSPACE/.scannerwork
@@ -173,7 +172,6 @@ pipeline {
               -e SONAR_TOKEN=$SONAR_TOKEN \
               -e SONAR_HOST_URL=http://35.200.201.42:9000 \
               --volumes-from $(cat /etc/hostname) \
-              -v $WORKSPACE/.scannerwork:/tmp/.scannerwork \
               sonarsource/sonar-scanner-cli:latest \
               -Dsonar.projectBaseDir=$WORKSPACE \
               -Dsonar.projectKey=micro-dash \
@@ -182,8 +180,9 @@ pipeline {
               -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
               -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
               -Dsonar.scm.disabled=true \
-              -Dsonar.working.directory=/tmp/.scannerwork
+              -Dsonar.working.directory=$WORKSPACE/.scannerwork
           '''
+          // ✅ Now the scannerwork is in WORKSPACE which is already shared via --volumes-from
           script {
             def props = readProperties file: "${WORKSPACE}/.scannerwork/report-task.txt"
             env.SONAR_TASK_ID = props['ceTaskId']
