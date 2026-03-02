@@ -280,7 +280,6 @@ pipeline {
   }
 
   post {
-    when {branch 'master'}
     success {
       emailext(
         subject: "SUCCESS!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
