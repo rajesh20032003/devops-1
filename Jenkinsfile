@@ -164,6 +164,11 @@ pipeline {
       steps {
         withSonarQubeEnv('sonarqube') {
           sh '''
+            # ✅ Clean and recreate with open permissions
+            rm -rf $WORKSPACE/.scannerwork
+            mkdir -p $WORKSPACE/.scannerwork
+            chmod 777 $WORKSPACE/.scannerwork
+
             docker run --rm \
               -e SONAR_TOKEN=$SONAR_TOKEN \
               -e SONAR_HOST_URL=http://35.200.201.42:9000 \
@@ -179,15 +184,24 @@ pipeline {
               -Dsonar.scm.disabled=true \
               -Dsonar.working.directory=/tmp/.scannerwork
           '''
-          // Read the task ID from the report file and set it for waitForQualityGate
           script {
-            def props = readProperties file: '.scannerwork/report-task.txt'
+            def props = readProperties file: "${WORKSPACE}/.scannerwork/report-task.txt"
             env.SONAR_TASK_ID = props['ceTaskId']
-            env.SONAR_SERVER_URL = props['serverUrl']
           }
         }
       }
     }
+
+stage('Quality Gate') {
+  agent any
+  steps {
+    withSonarQubeEnv('sonarqube') {
+      timeout(time: 5, unit: 'MINUTES') {
+        waitForQualityGate abortPipeline: true
+      }
+    }
+  }
+}
 
 stage('Quality Gate') {
   agent any
