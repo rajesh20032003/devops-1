@@ -4,6 +4,6 @@ const PORT = process.env.PORT || 3002;
 
 app.listen(PORT, () => {
   /* eslint-disable no-console */
-  console.log(`Gateway running on port ${PORT}`);
+  console.log(`Gateway! running on port ${PORT}`);
   /* eslint-enable no-console */
 });
