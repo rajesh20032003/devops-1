@@ -27,22 +27,40 @@ pipeline {
         '''
       }
     }
- stage('Secret Scan - GitLeaks') {
-  agent any
+ stage('Secret Scan - Gitleaks') {
+  agent {
+    docker {
+      image 'ghcr.io/gitleaks/gitleaks:latest'
+      args '--user root'  // so it can write report + access workspace
+    }
+  }
   steps {
+    // Explicit full clone inside the container
+    checkout scmGit(
+      branches: [[name: env.BRANCH_NAME]],
+      userRemoteConfigs: [[url: env.GIT_URL]],
+      extensions: [
+        [$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false],
+        [$class: 'CheckoutOption']
+      ]
+    )
+
     sh '''
-      docker run --rm \
-      -v $PWD:/repo \
-      -v $PWD/.git:/repo/.git \
-      ghcr.io/gitleaks/gitleaks:latest detect \
-      --source=/repo \
-      --redact \
-      --exit-code 1
+      mkdir -p gitleaks-report
+      gitleaks detect \
+        --source=. \
+        --redact \
+        --report-path=gitleaks-report/gitleaks-report.json \
+        --report-format=json \
+        --exit-code=1
     '''
   }
   post {
     always {
-      archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
+      archiveArtifacts artifacts: 'gitleaks-report/*.json', allowEmptyArchive: true
+    }
+    failure {
+      echo "CRITICAL: Secrets detected in repo!"
     }
   }
 }
