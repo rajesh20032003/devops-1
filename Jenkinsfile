@@ -140,8 +140,8 @@ pipeline {
               -Dsonar.projectBaseDir=$WORKSPACE \
               -Dsonar.projectKey=micro-dash \
               -Dsonar.projectName="Microservices Dashboard" \
-              -Dsonar.sources=gateway,user-service,order-service,frontend \
-              -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/** \
+              -Dsonar.sources=gateway,user-service,order-service \
+              -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/server.js,**/__test__/** \
               -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info \
               -Dsonar.scm.disabled=true
           '''
