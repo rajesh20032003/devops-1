@@ -27,6 +27,32 @@ pipeline {
         '''
       }
     }
+    stage('Secret Scanning (Gitleaks)') {
+    agent any   // or your preferred agent
+    steps {
+      // Use official Gitleaks Docker image
+      sh '''
+        docker run --rm \
+          -v ${WORKSPACE}:/repo \
+          -v ${WORKSPACE}/gitleaks-report:/report \
+          ghcr.io/gitleaks/gitleaks:latest \
+          detect \
+          --source=/repo \
+          --redact \
+          --report-path=/report/gitleaks-report.json \
+          --report-format=json \
+          --fail-on=High
+      '''
+    }
+    post {
+      always {
+        archiveArtifacts artifacts: 'gitleaks-report/*.json', allowEmptyArchive: true
+      }
+      failure {
+        echo "CRITICAL: Secrets detected in git history!"
+      }
+    }
+  }
 
     stage('Quality Checks') {
       parallel {
@@ -157,39 +183,44 @@ pipeline {
     //   }
     // }
    stage('SonarQube Analysis') {
-      agent any
-      environment {
-        SONAR_TOKEN = credentials('sonar-token')
-      }
-      steps {
-        withSonarQubeEnv('sonarqube') {
-          sh '''
-            rm -rf $WORKSPACE/.scannerwork
-            mkdir -p $WORKSPACE/.scannerwork
-            chmod 777 $WORKSPACE/.scannerwork
+    agent any
+    environment {
+      SONAR_TOKEN = credentials('sonar-token')
+    }
+    steps {
+      withSonarQubeEnv('sonarqube') {
+        sh '''
+          rm -rf $WORKSPACE/.scannerwork
+          mkdir -p $WORKSPACE/.scannerwork
+          chmod 777 $WORKSPACE/.scannerwork
 
-            docker run --rm \
-              -e SONAR_TOKEN=$SONAR_TOKEN \
-              -e SONAR_HOST_URL=http://35.200.201.42:9000 \
-              --volumes-from $(cat /etc/hostname) \
-              sonarsource/sonar-scanner-cli:latest \
-              -Dsonar.projectBaseDir=$WORKSPACE \
-              -Dsonar.projectKey=micro-dash \
-              -Dsonar.projectName="Microservices Dashboard" \
-              -Dsonar.sources=gateway,user-service,order-service \
-              -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
-              -Dsonar.scm.disabled=true \
-              -Dsonar.working.directory=$WORKSPACE/.scannerwork
-          '''
-          // ✅ Now the scannerwork is in WORKSPACE which is already shared via --volumes-from
-          script {
-            def props = readProperties file: "${WORKSPACE}/.scannerwork/report-task.txt"
-            env.SONAR_TASK_ID = props['ceTaskId']
-          }
+          docker run --rm \
+            -e SONAR_TOKEN=$SONAR_TOKEN \
+            -e SONAR_HOST_URL=http://35.200.201.42:9000 \
+            --volumes-from $(cat /etc/hostname) \
+            sonarsource/sonar-scanner-cli:latest \
+            -Dsonar.projectBaseDir=$WORKSPACE \
+            -Dsonar.projectKey=micro-dash \
+            -Dsonar.projectName="Microservices Dashboard" \
+            -Dsonar.sources=gateway,user-service,order-service \
+            -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
+            -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
+            -Dsonar.scm.disabled=true \
+            -Dsonar.working.directory=$WORKSPACE/.scannerwork
+        '''
+        script {
+          // ✅ Parse without readProperties plugin
+          def taskFile = readFile("${WORKSPACE}/.scannerwork/report-task.txt")
+          def ceTaskId = taskFile.readLines()
+            .find { it.startsWith('ceTaskId=') }
+            ?.replace('ceTaskId=', '')
+            ?.trim()
+          env.SONAR_TASK_ID = ceTaskId
+          echo "SonarQube Task ID: ${ceTaskId}"
         }
       }
     }
+  }
 
 stage('Quality Gate') {
   agent any
@@ -201,7 +232,6 @@ stage('Quality Gate') {
     }
   }
 }
-
     stage('Build Images!') {
       when {branch 'master'}
       parallel {
