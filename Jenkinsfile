@@ -35,6 +35,7 @@ pipeline {
         -v $PWD:/repo \
         ghcr.io/gitleaks/gitleaks:latest detect \
         --source=/repo \
+        --no-git \
         --redact \
         --exit-code 1
     '''
