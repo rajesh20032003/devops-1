@@ -124,6 +124,14 @@ pipeline {
     }
 
     stage('SonarQube Analysis') {
+      when {
+        anyOf {
+          changeset "**/gateway/**"
+          changeset "**/frontend/**"
+          changeset "**/user-service/**"
+          changeset "**/order-service/**"  
+        }
+      }
       agent any
       environment {
         SONAR_TOKEN = credentials('sonar-token')
