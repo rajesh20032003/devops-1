@@ -149,7 +149,7 @@ pipeline {
       }
     }
 
-    stage('Build Images') {
+    stage('Build Images!') {
       when {branch 'master'}
       parallel {
 
