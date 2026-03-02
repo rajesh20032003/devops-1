@@ -6,11 +6,11 @@ jest.mock('axios');
 
 test('dashboard returns combined data', async () => {
   axios.get.mockResolvedValueOnce({
-    data: [{ id: 1 }, { id: 2 }]
+    data: [{ id: 1 }, { id: 2 }],
   });
 
   axios.get.mockResolvedValueOnce({
-    data: [{ id: 101 }]
+    data: [{ id: 101 }],
   });
 
   const res = await request(app).get('/api/dashboard');
