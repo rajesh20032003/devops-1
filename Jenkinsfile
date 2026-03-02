@@ -27,37 +27,19 @@ pipeline {
         '''
       }
     }
- stage('Secret Scanning (Gitleaks)') {
-  agent {
-    docker {
-      image 'ghcr.io/gitleaks/gitleaks:latest'
-      args '--user root'  // so it can write report
-    }
-  }
+ stage('Secret Scan - GitLeaks') {
   steps {
-    // Checkout full repo inside the container
-    checkout scmGit(
-      branches: [[name: env.BRANCH_NAME]],
-      userRemoteConfigs: [[url: env.GIT_URL]],
-      extensions: [[$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false]]
-    )
-    
     sh '''
-      mkdir -p gitleaks-report
       gitleaks detect \
-        --source=. \
-        --redact \
-        --report-path=gitleaks-report/gitleaks-report.json \
-        --report-format=json \
-        --exit-code=1
+        --source . \
+        --report-path gitleaks-report.json \
+        --report-format json \
+        --exit-code 1
     '''
   }
   post {
     always {
-      archiveArtifacts artifacts: 'gitleaks-report/*.json', allowEmptyArchive: true
-    }
-    failure {
-      echo "CRITICAL: Secrets detected in repo!"
+      archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
     }
   }
 }
