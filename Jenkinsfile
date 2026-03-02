@@ -124,7 +124,39 @@ pipeline {
       }
     }
 
-    stage('SonarQube Analysis') {
+    // stage('SonarQube Analysis') {
+    //   agent any
+    //   environment {
+    //     SONAR_TOKEN = credentials('sonar-token')
+    //   }
+    //   steps {
+    //     withSonarQubeEnv('sonarqube') {
+    //       sh '''
+    //         docker run --rm \
+    //           -e SONAR_TOKEN=$SONAR_TOKEN \
+    //           -e SONAR_HOST_URL=http://35.200.201.42:9000 \
+    //           --volumes-from $(cat /etc/hostname) \
+    //           sonarsource/sonar-scanner-cli:latest \
+    //           -Dsonar.projectBaseDir=$WORKSPACE \
+    //           -Dsonar.projectKey=micro-dash \
+    //           -Dsonar.projectName="Microservices Dashboard" \
+    //           -Dsonar.sources=gateway,user-service,order-service \
+    //           -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
+    //           -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
+    //           -Dsonar.scm.disabled=true
+    //       '''
+    //     }
+    //   }
+     
+    // }
+    // stage("Quality Gate") {
+    //   steps {
+    //     timeout(time: 5, unit: 'MINUTES') {
+    //       waitForQualityGate abortPipeline: true
+    //     }
+    //   }
+    // }
+   stage('SonarQube Analysis') {
       agent any
       environment {
         SONAR_TOKEN = credentials('sonar-token')
@@ -136,6 +168,7 @@ pipeline {
               -e SONAR_TOKEN=$SONAR_TOKEN \
               -e SONAR_HOST_URL=http://35.200.201.42:9000 \
               --volumes-from $(cat /etc/hostname) \
+              -v $WORKSPACE/.scannerwork:/tmp/.scannerwork \
               sonarsource/sonar-scanner-cli:latest \
               -Dsonar.projectBaseDir=$WORKSPACE \
               -Dsonar.projectKey=micro-dash \
@@ -143,20 +176,29 @@ pipeline {
               -Dsonar.sources=gateway,user-service,order-service \
               -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
               -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
-              -Dsonar.scm.disabled=true
+              -Dsonar.scm.disabled=true \
+              -Dsonar.working.directory=/tmp/.scannerwork
           '''
-        }
-      }
-     
-    }
-    stage("Quality Gate") {
-      steps {
-        timeout(time: 5, unit: 'MINUTES') {
-          waitForQualityGate abortPipeline: true
+          // Read the task ID from the report file and set it for waitForQualityGate
+          script {
+            def props = readProperties file: '.scannerwork/report-task.txt'
+            env.SONAR_TASK_ID = props['ceTaskId']
+            env.SONAR_SERVER_URL = props['serverUrl']
+          }
         }
       }
     }
-   
+
+stage('Quality Gate') {
+  agent any
+  steps {
+    withSonarQubeEnv('sonarqube') {
+      timeout(time: 5, unit: 'MINUTES') {
+        waitForQualityGate abortPipeline: true
+      }
+    }
+  }
+}
     stage('Build Images!') {
       when {branch 'master'}
       parallel {
