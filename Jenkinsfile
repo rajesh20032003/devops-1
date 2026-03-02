@@ -43,7 +43,7 @@ pipeline {
             dir('gateway') {
               sh 'rm -rf node_modules'
               sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint'
+              sh 'npm run lint -- --fix'
               sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
             }
           }
@@ -67,7 +67,7 @@ pipeline {
             dir('user-service') {
               sh 'rm -rf node_modules'
               sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint'
+              sh 'npm run lint -- --fix'
               sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
             }
           }
@@ -91,7 +91,7 @@ pipeline {
             dir('order-service') {
               sh 'rm -rf node_modules'
               sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint'
+              sh 'npm run lint -- --fix'
               sh 'npx jest --clearCache'
               sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
             }
