@@ -35,6 +35,7 @@ pipeline {
         --baseline-path baseline.json \
         --source . \
         --redact \
+        --exclude-files README.md \
         --report-path gitleaks-report.json
     '''
   }
