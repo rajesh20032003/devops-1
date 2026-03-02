@@ -28,6 +28,7 @@ pipeline {
       }
     }
  stage('Secret Scan - GitLeaks') {
+  agent any
   steps {
     sh '''
       gitleaks detect \
