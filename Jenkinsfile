@@ -27,34 +27,33 @@ pipeline {
         '''
       }
     }
-  stage('Secret Scanning (Gitleaks)!') {
+  stage('Secret Scanning (Gitleaks)') {
   agent any
   steps {
-      sh '''
-  mkdir -p gitleaks-report
-  docker run --rm \
-    -v ${WORKSPACE}:/repo \
-    -v ${WORKSPACE}/gitleaks-report:/report \
-    ghcr.io/gitleaks/gitleaks:latest \
-    detect \
-    --source=/repo \
-    --no-git \                     # ← This is the key fix
-    --redact \
-    --report-path=/report/gitleaks-report.json \
-    --report-format=json \
-    --exit-code=1
-'''
+    sh '''
+      mkdir -p gitleaks-report
+      docker run --rm \
+        -v ${WORKSPACE}:/repo \
+        -v ${WORKSPACE}/gitleaks-report:/report \
+        ghcr.io/gitleaks/gitleaks:latest \
+        detect \
+        --source=/repo \
+        --no-git \
+        --redact \
+        --report-path=/report/gitleaks-report.json \
+        --report-format=json \
+        --exit-code=1
+    '''
   }
   post {
     always {
       archiveArtifacts artifacts: 'gitleaks-report/*.json', allowEmptyArchive: true
     }
     failure {
-      echo "CRITICAL: Secrets detected in git history!"
+      echo "CRITICAL: Secrets detected in repo!"
     }
   }
 }
-
     stage('Quality Checks') {
       parallel {
 
