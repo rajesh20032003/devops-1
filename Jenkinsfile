@@ -30,18 +30,20 @@ pipeline {
   stage('Secret Scanning (Gitleaks)!') {
   agent any
   steps {
-    sh '''
-      docker run --rm \
-        -v ${WORKSPACE}:/repo \
-        -v ${WORKSPACE}/gitleaks-report:/report \
-        ghcr.io/gitleaks/gitleaks:latest \
-        detect \
-        --source=/repo \
-        --redact \
-        --report-path=/report/gitleaks-report.json \
-        --report-format=json \
-        --exit-code=1   # Fail on ANY finding (simplest & safest)
-    '''
+      sh '''
+  mkdir -p gitleaks-report
+  docker run --rm \
+    -v ${WORKSPACE}:/repo \
+    -v ${WORKSPACE}/gitleaks-report:/report \
+    ghcr.io/gitleaks/gitleaks:latest \
+    detect \
+    --source=/repo \
+    --no-git \                     # ← This is the key fix
+    --redact \
+    --report-path=/report/gitleaks-report.json \
+    --report-format=json \
+    --exit-code=1
+'''
   }
   post {
     always {
