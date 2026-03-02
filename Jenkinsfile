@@ -29,20 +29,12 @@ pipeline {
     }
  stage('Secret Scan - Gitleaks') {
   agent any
-  steps {
-   sh '''
-    mkdir -p gitleaks-report
-
-    docker run --rm \
-      -v "$PWD":/repo \
-      -v "$PWD/gitleaks-report":/report \
-      ghcr.io/gitleaks/gitleaks:latest detect \
-      --source=/repo \
-      --no-git \
-      --redact \
-      --report-path=/report/gitleaks-report.json \
-      --report-format=json \
-      --exit-code=1
+   steps {
+    sh '''
+      gitleaks detect \
+        --source . \
+        --redact \
+        --report-path gitleaks-report.json
     '''
   }
   post {
