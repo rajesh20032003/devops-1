@@ -27,7 +27,7 @@ pipeline {
         '''
       }
     }
-  stage('Secret Scanning (Gitleaks)') {
+  stage('Secret Scanning (Gitleaks)!') {
   agent any
   steps {
     sh '''
