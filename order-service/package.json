@@ -23,6 +23,7 @@
     "lint": "eslint ."
   },"jest": {
   "collectCoverage": true,
+  "coverageDirectory": "coverage",
   "coverageReporters": ["lcov", "text"]
 },
   "keywords": [],

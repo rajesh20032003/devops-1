@@ -92,6 +92,7 @@ pipeline {
               sh 'rm -rf node_modules'
               sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
               sh 'npm run lint'
+              sh 'npx jest --clearCache'
               sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
             }
           }
