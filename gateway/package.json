@@ -12,8 +12,9 @@
     "test:watch": "jest --watch --coverage",
     "lint": "eslint ."
   },
-  "jest": {
-  "reporters": ["default", "jest-junit"]
+ "jest": {
+  "collectCoverage": true,
+  "coverageReporters": ["lcov", "text"]
 },
   "keywords": [],
   "author": "",
