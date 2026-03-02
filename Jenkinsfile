@@ -142,7 +142,7 @@ pipeline {
               -Dsonar.projectName="Microservices Dashboard" \
               -Dsonar.sources=gateway,user-service,order-service \
               -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/server.js,**/__test__/** \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info \
+              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
               -Dsonar.scm.disabled=true
           '''
         }
