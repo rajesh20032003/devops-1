@@ -32,6 +32,7 @@ pipeline {
    steps {
     sh '''
       gitleaks detect \
+        --baseline-path baseline.json \
         --source . \
         --redact \
         --report-path gitleaks-report.json
@@ -142,38 +143,6 @@ pipeline {
       }
     }
 
-    // stage('SonarQube Analysis') {
-    //   agent any
-    //   environment {
-    //     SONAR_TOKEN = credentials('sonar-token')
-    //   }
-    //   steps {
-    //     withSonarQubeEnv('sonarqube') {
-    //       sh '''
-    //         docker run --rm \
-    //           -e SONAR_TOKEN=$SONAR_TOKEN \
-    //           -e SONAR_HOST_URL=http://35.200.201.42:9000 \
-    //           --volumes-from $(cat /etc/hostname) \
-    //           sonarsource/sonar-scanner-cli:latest \
-    //           -Dsonar.projectBaseDir=$WORKSPACE \
-    //           -Dsonar.projectKey=micro-dash \
-    //           -Dsonar.projectName="Microservices Dashboard" \
-    //           -Dsonar.sources=gateway,user-service,order-service \
-    //           -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
-    //           -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
-    //           -Dsonar.scm.disabled=true
-    //       '''
-    //     }
-    //   }
-     
-    // }
-    // stage("Quality Gate") {
-    //   steps {
-    //     timeout(time: 5, unit: 'MINUTES') {
-    //       waitForQualityGate abortPipeline: true
-    //     }
-    //   }
-    // }
    stage('SonarQube Analysis') {
     agent any
     environment {
@@ -225,7 +194,7 @@ stage('Quality Gate') {
   }
 }
     stage('Build Images!') {
-      when {branch 'master'}
+      when {branch 'main'}
       parallel {
 
         stage('Build Frontend') {
@@ -288,7 +257,7 @@ stage('Quality Gate') {
     }
 
     stage('Trivy Scan') {
-      when {branch 'master'}
+      when {branch 'main'}
       agent any
       steps {
         sh '''
@@ -303,7 +272,7 @@ stage('Quality Gate') {
     }
 
     stage('Push Images') {
-        when { branch 'master' }
+        when { branch 'main' }
 
         parallel {
 
