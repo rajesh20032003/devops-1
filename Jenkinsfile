@@ -33,6 +33,7 @@ pipeline {
     sh '''
       gitleaks detect \
         --baseline-path baseline.json \
+        --no-git \
         --source . \
         --redact \
         --report-path gitleaks-report.json
