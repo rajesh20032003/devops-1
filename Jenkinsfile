@@ -124,51 +124,31 @@ pipeline {
       }
     }
 
-    // stage('SonarQube Analysis') {
-    //   agent any
-    //   environment {
-    //     SONAR_TOKEN = credentials('sonar-token')
-    //   }
-    //   steps {
-    //     withSonarQubeEnv('sonarqube') {
-    //       sh '''
-    //         docker run --rm \
-    //           -e SONAR_TOKEN=$SONAR_TOKEN \
-    //           -e SONAR_HOST_URL=http://35.200.201.42:9000 \
-    //           --volumes-from $(cat /etc/hostname) \
-    //           sonarsource/sonar-scanner-cli:latest \
-    //           -Dsonar.projectBaseDir=$WORKSPACE \
-    //           -Dsonar.projectKey=micro-dash \
-    //           -Dsonar.projectName="Microservices Dashboard" \
-    //           -Dsonar.sources=gateway,user-service,order-service \
-    //           -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
-    //           -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
-    //           -Dsonar.scm.disabled=true
-    //       '''
-    //     }
-    //   }
-     
-    // }
-    // stage("Quality Gate") {
-    //   steps {
-    //     timeout(time: 5, unit: 'MINUTES') {
-    //       waitForQualityGate abortPipeline: true
-    //     }
-    //   }
-    // }
     stage('SonarQube Analysis') {
+      agent any
+      environment {
+        SONAR_TOKEN = credentials('sonar-token')
+      }
       steps {
         withSonarQubeEnv('sonarqube') {
           sh '''
-            sonar-scanner \
+            docker run --rm \
+              -e SONAR_TOKEN=$SONAR_TOKEN \
+              -e SONAR_HOST_URL=http://35.200.201.42:9000 \
+              --volumes-from $(cat /etc/hostname) \
+              sonarsource/sonar-scanner-cli:latest \
+              -Dsonar.projectBaseDir=$WORKSPACE \
               -Dsonar.projectKey=micro-dash \
-              -Dsonar.sources=gateway,user-service,order-service,frontend \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info
+              -Dsonar.projectName="Microservices Dashboard" \
+              -Dsonar.sources=gateway,user-service,order-service \
+              -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
+              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
+              -Dsonar.scm.disabled=true
           '''
         }
       }
+     
     }
-
     stage("Quality Gate") {
       steps {
         timeout(time: 5, unit: 'MINUTES') {
@@ -176,7 +156,7 @@ pipeline {
         }
       }
     }
-
+   
     stage('Build Images!') {
       when {branch 'master'}
       parallel {
