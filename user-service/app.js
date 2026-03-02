@@ -3,7 +3,7 @@ const app = express();
 
 app.get('/users', (req, res) => {
   res.json([
-    { id: 1, name: 'Rajesh' },
+    { id: 1, name: 'Rajesh!' },
     { id: 2, name: 'DevOps Engineer' },
   ]);
 });
