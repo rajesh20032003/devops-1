@@ -56,6 +56,7 @@ pipeline {
         }
 
         stage('User Service') {
+          when { changeset "**/user-service/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -79,6 +80,7 @@ pipeline {
         }
 
         stage('Order Service') {
+          when { changeset "**/order-service/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -102,6 +104,7 @@ pipeline {
         }
 
         stage('Frontend') {
+          when { changeset "**/frontend/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -146,10 +149,16 @@ pipeline {
     }
 
     stage('Build Images') {
-      when {branch 'master'}
+      when {branch 'main'}
       parallel {
 
         stage('Build Frontend') {
+          when {
+            allOf {
+              branch 'main'
+              changeset "**/frontend/**"
+            }
+          }
           agent any
           steps {
             sh """
@@ -164,6 +173,12 @@ pipeline {
         }
 
         stage('Build Gateway') {
+          when {
+            allOf {
+              branch 'main'
+              changeset "**/gateway/**"
+            }
+          }
           agent any
           steps {
             sh """
@@ -178,6 +193,12 @@ pipeline {
         }
 
         stage('Build User Service') {
+          when {
+            allOf {
+              branch 'main'
+              changeset "**/user-service/**"
+            }
+          }
           agent any
           steps {
             sh """
@@ -192,6 +213,12 @@ pipeline {
         }
 
         stage('Build Order Service') {
+          when {
+            allOf {
+              branch 'main'
+              changeset "**/order-service/**"
+            }
+          }
           agent any
           steps {
             sh """
