@@ -4,7 +4,7 @@ const app = require('../app');
 
 jest.mock('axios');
 
-test('dashboard returns combined data', async () => {
+test('dashboard! returns combined data', async () => {
   axios.get.mockResolvedValueOnce({
     data: [{ id: 1 }, { id: 2 }],
   });
