@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="1" failures="0" errors="0" time="0.442">
-  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-02-28T05:48:29" time="0.399" tests="1">
-    <testcase classname=" health endpoint works" name=" health endpoint works" time="0.015">
+<testsuites name="jest tests" tests="3" failures="0" errors="0" time="0.828">
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-03-02T10:04:32" time="0.673" tests="2">
+    <testcase classname=" returns users list" name=" returns users list" time="0.032">
+    </testcase>
+    <testcase classname=" returns empty array when no users" name=" returns empty array when no users" time="0.004">
+    </testcase>
+  </testsuite>
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-03-02T10:04:32" time="0.057" tests="1">
+    <testcase classname=" health endpoint works" name=" health endpoint works" time="0.003">
     </testcase>
   </testsuite>
 </testsuites>
