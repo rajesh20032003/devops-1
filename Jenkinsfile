@@ -203,16 +203,6 @@ stage('Quality Gate') {
   }
 }
 
-stage('Quality Gate') {
-  agent any
-  steps {
-    withSonarQubeEnv('sonarqube') {
-      timeout(time: 5, unit: 'MINUTES') {
-        waitForQualityGate abortPipeline: true
-      }
-    }
-  }
-}
     stage('Build Images!') {
       when {branch 'master'}
       parallel {
