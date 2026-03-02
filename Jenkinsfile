@@ -32,6 +32,7 @@ pipeline {
       parallel {
 
         stage('Gateway') {
+          when { changeset "**/gateway/**" }
           agent {
             docker {
               image 'node:22-alpine'
