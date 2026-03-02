@@ -32,12 +32,12 @@ pipeline {
   steps {
     sh '''
       docker run --rm \
-        -v $PWD:/repo \
-        ghcr.io/gitleaks/gitleaks:latest detect \
-        --source=/repo \
-        --no-git \
-        --redact \
-        --exit-code 1
+      -v $PWD:/repo \
+      -v $PWD/.git:/repo/.git \
+      ghcr.io/gitleaks/gitleaks:latest detect \
+      --source=/repo \
+      --redact \
+      --exit-code 1
     '''
   }
   post {
