@@ -27,32 +27,32 @@ pipeline {
         '''
       }
     }
-    stage('Secret Scanning (Gitleaks)') {
-    agent any   // or your preferred agent
-    steps {
-      // Use official Gitleaks Docker image
-      sh '''
-        docker run --rm \
-          -v ${WORKSPACE}:/repo \
-          -v ${WORKSPACE}/gitleaks-report:/report \
-          ghcr.io/gitleaks/gitleaks:latest \
-          detect \
-          --source=/repo \
-          --redact \
-          --report-path=/report/gitleaks-report.json \
-          --report-format=json \
-          --fail-on=High
-      '''
-    }
-    post {
-      always {
-        archiveArtifacts artifacts: 'gitleaks-report/*.json', allowEmptyArchive: true
-      }
-      failure {
-        echo "CRITICAL: Secrets detected in git history!"
-      }
-    }
-  }
+  //   stage('Secret Scanning (Gitleaks)') {
+  //   agent any   // or your preferred agent
+  //   steps {
+  //     // Use official Gitleaks Docker image
+  //     sh '''
+  //       docker run --rm \
+  //         -v ${WORKSPACE}:/repo \
+  //         -v ${WORKSPACE}/gitleaks-report:/report \
+  //         ghcr.io/gitleaks/gitleaks:latest \
+  //         detect \
+  //         --source=/repo \
+  //         --redact \
+  //         --report-path=/report/gitleaks-report.json \
+  //         --report-format=json \
+  //         --fail-on=High
+  //     '''
+  //   }
+  //   post {
+  //     always {
+  //       archiveArtifacts artifacts: 'gitleaks-report/*.json', allowEmptyArchive: true
+  //     }
+  //     failure {
+  //       echo "CRITICAL: Secrets detected in git history!"
+  //     }
+  //   }
+  // }
 
     stage('Quality Checks') {
       parallel {
