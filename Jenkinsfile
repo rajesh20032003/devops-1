@@ -27,20 +27,27 @@ pipeline {
         '''
       }
     }
-  stage('Secret Scanning (Gitleaks)') {
-  agent any
+ stage('Secret Scanning (Gitleaks)') {
+  agent {
+    docker {
+      image 'ghcr.io/gitleaks/gitleaks:latest'
+      args '--user root'  // so it can write report
+    }
+  }
   steps {
+    // Checkout full repo inside the container
+    checkout scmGit(
+      branches: [[name: env.BRANCH_NAME]],
+      userRemoteConfigs: [[url: env.GIT_URL]],
+      extensions: [[$class: 'CloneOption', depth: 0, noTags: false, reference: '', shallow: false]]
+    )
+    
     sh '''
       mkdir -p gitleaks-report
-      docker run --rm \
-        -v ${WORKSPACE}:/repo \
-        -v ${WORKSPACE}/gitleaks-report:/report \
-        ghcr.io/gitleaks/gitleaks:latest \
-        detect \
-        --source=/repo \
-        --no-git \
+      gitleaks detect \
+        --source=. \
         --redact \
-        --report-path=/report/gitleaks-report.json \
+        --report-path=gitleaks-report/gitleaks-report.json \
         --report-format=json \
         --exit-code=1
     '''
