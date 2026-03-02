@@ -31,10 +31,11 @@ pipeline {
   agent any
   steps {
     sh '''
-      gitleaks detect \
-        --source . \
-        --report-path gitleaks-report.json \
-        --report-format json \
+      docker run --rm \
+        -v $PWD:/repo \
+        ghcr.io/gitleaks/gitleaks:latest detect \
+        --source=/repo \
+        --redact \
         --exit-code 1
     '''
   }
