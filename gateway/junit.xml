@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="3" failures="0" errors="0" time="0.386">
-  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-03-02T07:46:53" time="0.296" tests="2">
-    <testcase classname=" dashboard returns combined data" name=" dashboard returns combined data" time="0.017">
+<testsuites name="jest tests" tests="3" failures="0" errors="0" time="0.893">
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-03-02T08:02:02" time="0.561" tests="2">
+    <testcase classname=" dashboard! returns combined data" name=" dashboard! returns combined data" time="0.021">
     </testcase>
-    <testcase classname=" dashboard handles service failure" name=" dashboard handles service failure" time="0.006">
+    <testcase classname=" dashboard handles service failure" name=" dashboard handles service failure" time="0.004">
     </testcase>
   </testsuite>
-  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-03-02T07:46:53" time="0.046" tests="1">
+  <testsuite name="undefined" errors="0" failures="0" skipped="0" timestamp="2026-03-02T08:02:02" time="0.247" tests="1">
     <testcase classname=" health endpoint works" name=" health endpoint works" time="0.003">
     </testcase>
   </testsuite>

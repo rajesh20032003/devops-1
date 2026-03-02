@@ -145,6 +145,7 @@ pipeline {
     }
 
     stage('Build Images') {
+      when {branch 'master'}
       parallel {
 
         stage('Build Frontend') {
@@ -207,6 +208,7 @@ pipeline {
     }
 
     stage('Trivy Scan') {
+      when {branch 'master'}
       agent any
       steps {
         sh '''
@@ -278,6 +280,7 @@ pipeline {
   }
 
   post {
+    when {branch 'master'}
     success {
       emailext(
         subject: "SUCCESS!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
