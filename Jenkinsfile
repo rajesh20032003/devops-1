@@ -194,7 +194,12 @@ stage('Quality Gate') {
   }
 }
 stage('Set Image Version') {
-  agent any
+   when {
+        anyOf {
+          //branch 'main'
+          buildingTag()
+        }
+      }
   steps {
     script {
       if (env.TAG_NAME) {
@@ -210,7 +215,7 @@ stage('Set Image Version') {
     stage('Build Images!') {
       when {
         anyOf {
-          branch 'main'
+          //branch 'main'
           buildingTag()
         }
       }
@@ -274,7 +279,7 @@ stage('Set Image Version') {
     stage('Trivy Scan') {
       when {
         anyOf {
-          branch 'main'
+          //branch 'main'
           buildingTag()
         }
       }
@@ -294,7 +299,7 @@ stage('Set Image Version') {
     stage('Push Images') {
         when {
           anyOf {
-            branch 'main'
+            //branch 'main'
             buildingTag()
           }
         }

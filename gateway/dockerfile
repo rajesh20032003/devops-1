@@ -6,7 +6,7 @@
 # CMD ["node","app.js"]
 # single build 139 mb 
 #gateway
-from node:18-alpine as builder
+from node:22-alpine as builder
 workdir /app
 copy package*.json ./
 run npm ci --omit=dev
