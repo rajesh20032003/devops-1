@@ -294,8 +294,8 @@ stage('Set Image Version') {
     stage('Push Images') {
         when {
           anyOf {
-            buildTag()
             branch 'main'
+            buildTag()
           }
         }
 
