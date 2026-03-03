@@ -55,7 +55,6 @@ pipeline {
           when { 
             anyOf{
                changeset "**/gateway/**"
-               changeset "null"
             }
            }
           agent {
@@ -84,7 +83,6 @@ pipeline {
            when { 
             anyOf{
                changeset "**/user-service/**"
-               changeset "null"
             }
            }
           agent {
@@ -113,7 +111,6 @@ pipeline {
           when { 
             anyOf{
                changeset "**/order-service/**"
-               changeset "null"
             }
            }
           agent {
@@ -300,7 +297,6 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -337,7 +333,6 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -374,7 +369,6 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -417,7 +411,6 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -440,7 +433,6 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -463,7 +455,6 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -486,7 +477,6 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -515,7 +505,6 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -545,7 +534,6 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -575,7 +563,6 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
-              changeset "null"
               buildingTag()
             }
           }
@@ -605,7 +592,6 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
-              changeset "null"
               buildingTag()
             }
           }
