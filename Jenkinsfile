@@ -426,7 +426,7 @@ pipeline {
               passwordVariable: 'DOCKER_PASS'
             )]) {
               sh '''
-                trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+                trivy image --cache-dir $WORKSPACE/.trivy-frontend --scanners vuln --exit-code 1 --severity CRITICAL \
                   $DOCKER_USER/frontend:ci-${BUILD_NUMBER}
               '''
             }
@@ -449,7 +449,7 @@ pipeline {
               passwordVariable: 'DOCKER_PASS'
             )]) {
               sh '''
-                trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+                trivy image --cache-dir $WORKSPACE/.trivy-gateway --scanners vuln --exit-code 1 --severity CRITICAL \
                   $DOCKER_USER/gateway:ci-${BUILD_NUMBER}
               '''
             }
@@ -472,7 +472,7 @@ pipeline {
               passwordVariable: 'DOCKER_PASS'
             )]) {
               sh '''
-                trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+                trivy image --cache-dir $WORKSPACE/.trivy-order-service --scanners vuln --exit-code 1 --severity CRITICAL \
                   $DOCKER_USER/order-service:ci-${BUILD_NUMBER}
               '''
             }
@@ -495,7 +495,7 @@ pipeline {
               passwordVariable: 'DOCKER_PASS'
             )]) {
               sh '''
-                trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+                trivy image --cache-dir $WORKSPACE/.trivy-user-service --scanners vuln --exit-code 1 --severity CRITICAL \
                   $DOCKER_USER/user-service:ci-${BUILD_NUMBER}
               '''
             }
