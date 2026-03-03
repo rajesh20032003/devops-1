@@ -262,20 +262,31 @@ stage('Set Image Version') {
 stage('Trivy Scan') {
   agent any
   steps {
-    sh '''
-      CI_TAG="ci-${BUILD_NUMBER}"
-      trivy image --download-db-only --cache-dir $HOME/.trivy
+    withCredentials([
+      usernamePassword(
+        credentialsId: 'docker-hub-credentials',
+        usernameVariable: 'DOCKER_USER',
+        passwordVariable: 'DOCKER_PASS'
+      )
+    ]) {
+      sh '''
+        CI_TAG="ci-${BUILD_NUMBER}"
 
-      SERVICES="frontend gateway user-service order-service"
+        trivy image --download-db-only --cache-dir $HOME/.trivy
 
-      for SERVICE in $SERVICES; do
-        echo "Scanning $SERVICE"
-        trivy image \
-          --exit-code 1 \
-          --severity CRITICAL \
-          $DOCKER_USER/$SERVICE:${CI_TAG}
-      done
-    '''
+        SERVICES="frontend gateway user-service order-service"
+
+        for SERVICE in $SERVICES; do
+          echo "Scanning $DOCKER_USER/$SERVICE:$CI_TAG"
+
+          trivy image \
+            --scanners vuln \
+            --exit-code 1 \
+            --severity CRITICAL \
+            $DOCKER_USER/$SERVICE:$CI_TAG
+        done
+      '''
+    }
   }
 }
 stage('Promote Images') {
