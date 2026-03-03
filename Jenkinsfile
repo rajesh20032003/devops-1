@@ -52,7 +52,7 @@ pipeline {
       parallel {
 
         stage('Gateway') {
-          // when { changeset "**/gateway/**" }
+           when { changeset "**/gateway/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -76,7 +76,7 @@ pipeline {
         }
 
         stage('User Service') {
-          // when { changeset "**/user-service/**" }
+           when { changeset "**/user-service/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -100,7 +100,7 @@ pipeline {
         }
 
         stage('Order Service') {
-          // when { changeset "**/order-service/**" }
+           when { changeset "**/order-service/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -125,7 +125,7 @@ pipeline {
         }
 
         stage('Frontend') {
-          // when { changeset "**/frontend/**" }
+           when { changeset "**/frontend/**" }
           agent {
             docker {
               image 'node:22-alpine'
@@ -215,12 +215,14 @@ stage('Set Image Version') {
     }
   }
 }
-    
-   stage('Build & Push Images') {
+
+  stage('build and push images'){
+    parallel{
+      stage('Build Frontend') {
       when {
         anyOf {
+          changeset "frontend/**"
           buildingTag()
-          branch 'main'
         }
       }
       agent {
@@ -236,96 +238,437 @@ stage('Set Image Version') {
           passwordVariable: 'DOCKER_PASS'
         )]) {
           sh '''
-            echo "=== Setup Builder ==="
+            CI_TAG="ci-${BUILD_NUMBER}"
+
             docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
             docker buildx inspect --bootstrap
 
             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-            SERVICES="frontend gateway user-service order-service"
-
-            for SERVICE in $SERVICES; do
-              echo "=== Building $SERVICE ==="
-              CI_TAG="ci-${BUILD_NUMBER}"
-              docker buildx build \
-                --builder ci-builder \
-                --cache-from=type=registry,ref=$DOCKER_USER/$SERVICE:cache \
-                --cache-to=type=registry,ref=$DOCKER_USER/$SERVICE:cache,mode=max \
-                -t $DOCKER_USER/$SERVICE:${CI_TAG} \
-                --push \
-                ./$SERVICE
-            done
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$DOCKER_USER/frontend:cache \
+              --cache-to=type=registry,ref=$DOCKER_USER/frontend:cache,mode=max \
+              -t $DOCKER_USER/frontend:${CI_TAG} \
+              --push \
+              ./frontend
           '''
     }
   }
 }
-stage('Trivy Scan') {
-  agent any
-  steps {
-    withCredentials([
-      usernamePassword(
-        credentialsId: 'docker-hub-credentials',
-        usernameVariable: 'DOCKER_USER',
-        passwordVariable: 'DOCKER_PASS'
-      )
-    ]) {
-      sh '''
-        CI_TAG="ci-${BUILD_NUMBER}"
+   stage('Build gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+          sh '''
+            CI_TAG="ci-${BUILD_NUMBER}"
 
-        trivy image --download-db-only --cache-dir $HOME/.trivy
+            docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
 
-        SERVICES="frontend gateway user-service order-service"
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-        for SERVICE in $SERVICES; do
-          echo "Scanning $DOCKER_USER/$SERVICE:$CI_TAG"
-
-          trivy image \
-            --scanners vuln \
-            --exit-code 1 \
-            --severity CRITICAL \
-            $DOCKER_USER/$SERVICE:$CI_TAG
-        done
-      '''
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$DOCKER_USER/gateway:cache \
+              --cache-to=type=registry,ref=$DOCKER_USER/gateway:cache,mode=max \
+              -t $DOCKER_USER/gateway:${CI_TAG} \
+              --push \
+              ./gateway
+          '''
     }
   }
 }
-stage('Promote Images') {
-  when {
-    anyOf {
-      buildingTag()
-      branch 'main'
+stage('Build user-service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+          sh '''
+            CI_TAG="ci-${BUILD_NUMBER}"
+
+            docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
+
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$DOCKER_USER/user-service:cache \
+              --cache-to=type=registry,ref=$DOCKER_USER/order-service:cache,mode=max \
+              -t $DOCKER_USER/user-service:${CI_TAG} \
+              --push \
+              ./user-service
+          '''
     }
   }
-  agent {
-    docker {
-      image 'docker:28-cli'
-      args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+}
+stage('Build order-service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+          sh '''
+            CI_TAG="ci-${BUILD_NUMBER}"
+
+            docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
+
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$DOCKER_USER/order-service:cache \
+              --cache-to=type=registry,ref=$DOCKER_USER/order-service:cache,mode=max \
+              -t $DOCKER_USER/order-service:${CI_TAG} \
+              --push \
+              ./order-service
+          '''
+    }
+  }
+}
+    }
+  }
+    
+//    stage('Build & Push Images') {
+//       when {
+//         anyOf {
+//           buildingTag()
+//           branch 'main'
+//         }
+//       }
+//       agent {
+//         docker {
+//           image 'docker:28-cli'
+//           args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+//         }
+//       }
+//       steps {
+//         withCredentials([usernamePassword(
+//           credentialsId: 'docker-hub-credentials',
+//           usernameVariable: 'DOCKER_USER',
+//           passwordVariable: 'DOCKER_PASS'
+//         )]) {
+//           sh '''
+//             echo "=== Setup Builder ==="
+//             docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
+//             docker buildx inspect --bootstrap
+
+//             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+//             SERVICES="frontend gateway user-service order-service"
+
+//             for SERVICE in $SERVICES; do
+//               echo "=== Building $SERVICE ==="
+//               CI_TAG="ci-${BUILD_NUMBER}"
+//               docker buildx build \
+//                 --builder ci-builder \
+//                 --cache-from=type=registry,ref=$DOCKER_USER/$SERVICE:cache \
+//                 --cache-to=type=registry,ref=$DOCKER_USER/$SERVICE:cache,mode=max \
+//                 -t $DOCKER_USER/$SERVICE:${CI_TAG} \
+//                 --push \
+//                 ./$SERVICE
+//             done
+//           '''
+//     }
+//   }
+// }
+
+stage("trivy scan"){
+  parallel{
+    stage('Scan frontend') {
+  when {
+    anyOf {
+      changeset "frontend/**"
+      buildingTag()
     }
   }
   steps {
-    withCredentials([usernamePassword(
-      credentialsId: 'docker-hub-credentials',
-      usernameVariable: 'DOCKER_USER',
-      passwordVariable: 'DOCKER_PASS'
-    )]) {
-      sh '''
+    sh '''
+      trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+      $DOCKER_USER/frontend:ci-${BUILD_NUMBER}
+    '''
+  }
+}
+stage('Scan Gateway') {
+  when {
+    anyOf {
+      changeset "gateway/**"
+      buildingTag()
+    }
+  }
+  steps {
+    sh '''
+      trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+      $DOCKER_USER/gateway:ci-${BUILD_NUMBER}
+    '''
+  }
+}
+stage('Scan order-service') {
+  when {
+    anyOf {
+      changeset "order-service/**"
+      buildingTag()
+    }
+  }
+  steps {
+    sh '''
+      trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+      $DOCKER_USER/order-service:ci-${BUILD_NUMBER}
+    '''
+  }
+}
+stage('Scan user-service') {
+  when {
+    anyOf {
+      changeset "user-service/**"
+      buildingTag()
+    }
+  }
+  steps {
+    sh '''
+      trivy image --scanners vuln --exit-code 1 --severity CRITICAL \
+      $DOCKER_USER/user-service:ci-${BUILD_NUMBER}
+    '''
+  }
+}
+  }
+}
+
+// stage('Trivy Scan') {
+//   agent any
+//   steps {
+//     withCredentials([
+//       usernamePassword(
+//         credentialsId: 'docker-hub-credentials',
+//         usernameVariable: 'DOCKER_USER',
+//         passwordVariable: 'DOCKER_PASS'
+//       )
+//     ]) {
+//       sh '''
+//         CI_TAG="ci-${BUILD_NUMBER}"
+
+//         trivy image --download-db-only --cache-dir $HOME/.trivy
+
+//         SERVICES="frontend gateway user-service order-service"
+
+//         for SERVICE in $SERVICES; do
+//           echo "Scanning $DOCKER_USER/$SERVICE:$CI_TAG"
+
+//           trivy image \
+//             --scanners vuln \
+//             --exit-code 1 \
+//             --severity CRITICAL \
+//             $DOCKER_USER/$SERVICE:$CI_TAG
+//         done
+//       '''
+//     }
+//   }
+// }
+stage('promote images') {
+  parallel{
+    stage('promote order-service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+           sh '''
         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-        SERVICES="frontend gateway user-service order-service"
-
-        for SERVICE in $SERVICES; do
-          docker pull $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER}
-
+          SERVICE=order-service
           docker tag \
             $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER} \
             $DOCKER_USER/$SERVICE:${IMAGE_TAG}
-
           docker push $DOCKER_USER/$SERVICE:${IMAGE_TAG}
-        done
       '''
     }
   }
 }
+stage('promote user-service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+           sh '''
+        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+          SERVICE=user-service
+          docker tag \
+            $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER} \
+            $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+          docker push $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+      '''
+    }
+  }
+}
+stage('promote gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+           sh '''
+        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+          SERVICE=gateway
+          docker tag \
+            $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER} \
+            $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+          docker push $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+      '''
+    }
+  }
+}
+stage('promote frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+        }
+      }
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(
+          credentialsId: 'docker-hub-credentials',
+          usernameVariable: 'DOCKER_USER',
+          passwordVariable: 'DOCKER_PASS'
+        )]) {
+           sh '''
+        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+          SERVICE=frontend
+          docker tag \
+            $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER} \
+            $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+          docker push $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+      '''
+    }
+  }
+}
+  }
+}
+// stage('Promote Images') {
+//   when {
+//     anyOf {
+//       buildingTag()
+//       branch 'main'
+//     }
+//   }
+//   agent {
+//     docker {
+//       image 'docker:28-cli'
+//       args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+//     }
+//   }
+//   steps {
+//     withCredentials([usernamePassword(
+//       credentialsId: 'docker-hub-credentials',
+//       usernameVariable: 'DOCKER_USER',
+//       passwordVariable: 'DOCKER_PASS'
+//     )]) {
+//       sh '''
+//         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+//         SERVICES="frontend gateway user-service order-service"
+
+//         for SERVICE in $SERVICES; do
+//           docker pull $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER}
+
+//           docker tag \
+//             $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER} \
+//             $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+
+//           docker push $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+//         done
+//       '''
+//     }
+//   }
+// }
     
     stage('Cleanup!') {
       agent any
