@@ -382,7 +382,7 @@ stage('Set Image Version') {
             }
           }
 
-          stage('Push Order Service') {
+          stage('Push Order Service!') {
             steps {
               script {
                 docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
