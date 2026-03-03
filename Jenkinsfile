@@ -263,6 +263,7 @@ stage('Trivy Scan') {
   agent any
   steps {
     sh '''
+      CI_TAG="ci-${BUILD_NUMBER}"
       trivy image --download-db-only --cache-dir $HOME/.trivy
 
       SERVICES="frontend gateway user-service order-service"
