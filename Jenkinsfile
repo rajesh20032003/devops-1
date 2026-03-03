@@ -275,7 +275,7 @@ stage('Set Image Version') {
       when {
         anyOf {
           branch 'main'
-          buildTag()
+          buildingTag()
         }
       }
       agent any
@@ -295,7 +295,7 @@ stage('Set Image Version') {
         when {
           anyOf {
             branch 'main'
-            buildTag()
+            buildingTag()
           }
         }
 
