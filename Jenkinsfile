@@ -315,12 +315,12 @@ stage('Set Image Version') {
           sh '''
             export DOCKER_BUILDKIT=1
 
-            echo "=== DEBUG: Buildx Available ==="
-            docker buildx version
-            docker buildx ls
+            echo "=== Setup Builder ==="
+            docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
 
             echo "=== Docker Login ==="
-            docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
             echo "=== Building Image ==="
             docker buildx build \
