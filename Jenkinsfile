@@ -299,7 +299,13 @@ stage('Set Image Version') {
         '''
       }
     }
-   stage('Build & Push Frontend!') {
+   stage('Build & Push Images') {
+      when {
+        anyOf {
+          buildingTag()
+          branch 'main'
+        }
+      }
       agent {
         docker {
           image 'docker:28-cli'
@@ -313,23 +319,24 @@ stage('Set Image Version') {
           passwordVariable: 'DOCKER_PASS'
         )]) {
           sh '''
-            export DOCKER_BUILDKIT=1
-
             echo "=== Setup Builder ==="
             docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
             docker buildx inspect --bootstrap
 
-            echo "=== Docker Login ==="
             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-            echo "=== Building Image ==="
-            docker buildx build \
-              --builder ci-builder \
-              --cache-from=type=registry,ref=${DOCKER_USER}/frontend:cache \
-              --cache-to=type=registry,ref=${DOCKER_USER}/frontend:cache,mode=max \
-              -t ${DOCKER_USER}/frontend:dev-${BUILD_NUMBER} \
-              --push \
-              ./frontend
+            SERVICES="frontend gateway user-service order-service"
+
+            for SERVICE in $SERVICES; do
+              echo "=== Building $SERVICE ==="
+              docker buildx build \
+                --builder ci-builder \
+                --cache-from=type=registry,ref=$DOCKER_USER/$SERVICE:cache \
+                --cache-to=type=registry,ref=$DOCKER_USER/$SERVICE:cache,mode=max \
+                -t $DOCKER_USER/$SERVICE:${IMAGE_TAG} \
+                --push \
+                ./$SERVICE
+            done
           '''
     }
   }
