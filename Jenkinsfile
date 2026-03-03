@@ -215,90 +215,7 @@ stage('Set Image Version') {
     }
   }
 }
-    stage('Build Images!') {
-      when {
-        anyOf {
-          //branch 'main'
-          buildingTag()
-        }
-      }
-      parallel {
-
-        stage('Build Frontend') {
-          agent any
-          steps {
-            sh """
-              docker pull ${DOCKER_REGISTRY}/frontend:latest || true
-              docker build \
-                --cache-from ${DOCKER_REGISTRY}/frontend:latest \
-                -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} \
-                ./frontend
-            """
-          }
-        }
-
-        stage('Build Gateway') {
-          agent any
-          steps {
-            sh """
-              docker pull ${DOCKER_REGISTRY}/gateway:latest || true
-              docker build \
-                --cache-from ${DOCKER_REGISTRY}/gateway:latest \
-                -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} \
-                ./gateway
-            """
-          }
-        }
-
-        stage('Build User Service') {
-          agent any
-          steps {
-            sh """
-              docker pull ${DOCKER_REGISTRY}/user-service:latest || true
-              docker build \
-                --cache-from ${DOCKER_REGISTRY}/user-service:latest \
-                -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} \
-                ./user-service
-            """
-          }
-        }
-
-        stage('Build Order Service') {
-          agent any
-          steps {
-            sh """
-              docker pull ${DOCKER_REGISTRY}/order-service:latest || true
-              docker build \
-                --cache-from ${DOCKER_REGISTRY}/order-service:latest \
-                -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} \
-                ./order-service
-            """
-          }
-        }
-
-      }
-    }
-
-    stage('Trivy Scan') {
-      when {branch 'master'}
-      // when {
-      //   anyOf {
-      //     //branch 'main'
-      //     buildingTag()
-      //   }
-      // }
-      agent any
-      steps {
-        sh '''
-          trivy image --download-db-only --cache-dir $HOME/.trivy
-          
-          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}
-          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}
-          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}
-          trivy image --exit-code 1 --severity CRITICAL --cache-dir $HOME/.trivy ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}
-        '''
-      }
-    }
+    
    stage('Build & Push Images') {
       when {
         anyOf {
@@ -329,11 +246,12 @@ stage('Set Image Version') {
 
             for SERVICE in $SERVICES; do
               echo "=== Building $SERVICE ==="
+              CI_TAG="ci-${BUILD_NUMBER}"
               docker buildx build \
                 --builder ci-builder \
                 --cache-from=type=registry,ref=$DOCKER_USER/$SERVICE:cache \
                 --cache-to=type=registry,ref=$DOCKER_USER/$SERVICE:cache,mode=max \
-                -t $DOCKER_USER/$SERVICE:${IMAGE_TAG} \
+                -t $DOCKER_USER/$SERVICE:${CI_TAG} \
                 --push \
                 ./$SERVICE
             done
@@ -341,59 +259,62 @@ stage('Set Image Version') {
     }
   }
 }
-    stage('Push Images') {
-      when {branch 'master'}
-        // when {
-        //   anyOf {
-        //     //branch 'main'
-        //     buildingTag()
-        //   }
-        // }
+stage('Trivy Scan') {
+  agent any
+  steps {
+    sh '''
+      trivy image --download-db-only --cache-dir $HOME/.trivy
 
-        parallel {
+      SERVICES="frontend gateway user-service order-service"
 
-          stage('Push Frontend') {
-            steps {
-              script {
-                docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                  docker.image("${DOCKER_REGISTRY}/frontend:${IMAGE_TAG}").push()
-                }
-              }
-            }
-          }
+      for SERVICE in $SERVICES; do
+        echo "Scanning $SERVICE"
+        trivy image \
+          --exit-code 1 \
+          --severity CRITICAL \
+          $DOCKER_USER/$SERVICE:${CI_TAG}
+      done
+    '''
+  }
+}
+stage('Promote Images') {
+  when {
+    anyOf {
+      buildingTag()
+      branch 'main'
+    }
+  }
+  agent {
+    docker {
+      image 'docker:28-cli'
+      args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+    }
+  }
+  steps {
+    withCredentials([usernamePassword(
+      credentialsId: 'docker-hub-credentials',
+      usernameVariable: 'DOCKER_USER',
+      passwordVariable: 'DOCKER_PASS'
+    )]) {
+      sh '''
+        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-          stage('Push Gateway') {
-            steps {
-              script {
-                docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                  docker.image("${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}").push()
-                }
-              }
-            }
-          }
+        SERVICES="frontend gateway user-service order-service"
 
-          stage('Push User Service') {
-            steps {
-              script {
-                docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                  docker.image("${DOCKER_REGISTRY}/user-service:${IMAGE_TAG}").push()
-                }
-              }
-            }
-          }
+        for SERVICE in $SERVICES; do
+          docker pull $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER}
 
-          stage('Push Order Service!') {
-            steps {
-              script {
-                docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                  docker.image("${DOCKER_REGISTRY}/order-service:${IMAGE_TAG}").push()
-                }
-              }
-            }
-          }
+          docker tag \
+            $DOCKER_USER/$SERVICE:ci-${BUILD_NUMBER} \
+            $DOCKER_USER/$SERVICE:${IMAGE_TAG}
 
-        }
-      }
+          docker push $DOCKER_USER/$SERVICE:${IMAGE_TAG}
+        done
+      '''
+    }
+  }
+}
+    
     stage('Cleanup') {
       agent any
       steps {
