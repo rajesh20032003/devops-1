@@ -52,7 +52,10 @@ pipeline {
       parallel {
 
         stage('Gateway') {
-          when { changeset "**/gateway/**" }
+          when { 
+            changeset "**/gateway/**"
+            changeset "Jenkinsfile"
+           }
           agent {
             docker {
               image 'node:22-alpine'
@@ -76,7 +79,10 @@ pipeline {
         }
 
         stage('User Service') {
-          when { changeset "**/user-service/**" }
+          when { 
+            changeset "**/user-service/**"
+            changeset "Jenkinsfile"
+             }
           agent {
             docker {
               image 'node:22-alpine'
@@ -100,7 +106,10 @@ pipeline {
         }
 
         stage('Order Service') {
-          when { changeset "**/order-service/**" }
+          when { 
+            changeset "**/order-service/**"
+            changeset "Jenkinsfile"
+             }
           agent {
             docker {
               image 'node:22-alpine'
@@ -125,7 +134,10 @@ pipeline {
         }
 
         stage('Frontend') {
-          when { changeset "**/frontend/**" }
+          when { 
+                 changeset "**/frontend/**"
+                 changeset "Jenkinsfile"
+           }
           agent {
             docker {
               image 'node:22-alpine'
@@ -151,6 +163,7 @@ pipeline {
               changeset "order-service/**"
               changeset "user-service/**"
               changeset "frontend/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -199,6 +212,7 @@ pipeline {
               changeset "order-service/**"
               changeset "user-service/**"
               changeset "frontend/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -215,8 +229,14 @@ pipeline {
     stage('Set Image Version') {
       when {
         anyOf {
-          branch 'main'
+          changeset "gateway/**"
+          changeset "order-service/**"
+          changeset "user-service/**"
+          changeset "frontend/**"
+          changeset "Jenkinsfile"
+          //branch 'main'
           buildingTag()
+
         }
       }
       agent any
@@ -240,6 +260,7 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -276,6 +297,7 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -312,6 +334,7 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -348,6 +371,7 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -390,6 +414,7 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -412,6 +437,7 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -434,6 +460,7 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -456,6 +483,7 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -484,6 +512,7 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -513,6 +542,7 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -542,6 +572,7 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -571,6 +602,7 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
+              changeset "Jenkinsfile"
               buildingTag()
             }
           }
