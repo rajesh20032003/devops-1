@@ -48,7 +48,7 @@ pipeline {
   }
 }
     stage('Quality Checks') {
-      when {branch 'master'}
+      //when {branch 'master'}
       parallel {
 
         stage('Gateway') {
@@ -145,7 +145,7 @@ pipeline {
     }
 
    stage('SonarQube Analysis') {
-    when {branch 'master'}
+    //when {branch 'master'}
     agent any
     environment {
       SONAR_TOKEN = credentials('sonar-token')
@@ -186,7 +186,7 @@ pipeline {
   }
 
 stage('Quality Gate') {
-  when {branch 'master'}
+ // when {branch 'master'}
   agent any
   steps {
     withSonarQubeEnv('sonarqube') {
