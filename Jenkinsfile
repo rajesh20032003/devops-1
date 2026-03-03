@@ -145,6 +145,15 @@ pipeline {
     }
 
     stage('SonarQube Analysis') {
+      when {
+            anyOf {
+              changeset "gateway/**"
+              changeset "order-service/**"
+              changeset "user-service/**"
+              changeset "frontend/**"
+              buildingTag()
+            }
+          }
       agent any
       environment {
         SONAR_TOKEN = credentials('sonar-token')
@@ -184,6 +193,15 @@ pipeline {
     }
 
     stage('Quality Gate') {
+       when {
+            anyOf {
+              changeset "gateway/**"
+              changeset "order-service/**"
+              changeset "user-service/**"
+              changeset "frontend/**"
+              buildingTag()
+            }
+          }
       agent any
       steps {
         withSonarQubeEnv('sonarqube') {
