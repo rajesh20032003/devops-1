@@ -327,7 +327,7 @@ stage('Promote Images') {
   }
 }
     
-    stage('Cleanup') {
+    stage('Cleanup!') {
       agent any
       steps {
         cleanWs()
