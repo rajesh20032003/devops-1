@@ -3,7 +3,6 @@ pipeline {
 
   environment {
     DOCKER_REGISTRY = "rajesh00007"
-    IMAGE_TAG = "${BUILD_NUMBER}"
   }
 
   options {
@@ -194,20 +193,24 @@ stage('Quality Gate') {
     }
   }
 }
-script {
-    if (env.TAG_NAME) {
+stage('Set Image Version') {
+  agent any
+  steps {
+    script {
+      if (env.TAG_NAME) {
         env.IMAGE_TAG = env.TAG_NAME
         echo "Release build detected. Version: ${env.IMAGE_TAG}"
-    } else {
+      } else {
         env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
         echo "Non-release build. Using dev tag: ${env.IMAGE_TAG}"
+      }
     }
+  }
 }
-
     stage('Build Images!') {
       when {
         anyOf {
-          //branch 'main'
+          branch 'main'
           buildingTag()
         }
       }
@@ -269,7 +272,12 @@ script {
     }
 
     stage('Trivy Scan') {
-      when {branch 'main'}
+      when {
+        anyOf {
+          branch 'main'
+          buildTag()
+        }
+      }
       agent any
       steps {
         sh '''
@@ -284,7 +292,12 @@ script {
     }
 
     stage('Push Images') {
-        when { branch 'main' }
+        when {
+          anyOf {
+            buildTag()
+            branch 'main'
+          }
+        }
 
         parallel {
 
