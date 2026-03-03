@@ -295,7 +295,7 @@ stage('Set Image Version') {
         '''
       }
     }
-    stage('Build & Push Frontend') {
+    stage('Build & Push Frontend!') {
       agent {
         docker {
           image 'docker:24-cli'
