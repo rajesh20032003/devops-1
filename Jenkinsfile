@@ -306,9 +306,6 @@ stage('Set Image Version') {
           args '-v /var/run/docker.sock:/var/run/docker.sock'
         }
       }
-      environment {
-        DOCKER_BUILDKIT = "1"
-      }
       steps {
         withCredentials([usernamePassword(
           credentialsId: 'docker-hub-credentials',
@@ -316,10 +313,16 @@ stage('Set Image Version') {
           passwordVariable: 'DOCKER_PASS'
         )]) {
           sh """
+            export DOCKER_BUILDKIT=1
+
+            echo "=== DEBUG: Buildx Available ==="
+            docker buildx version
             docker buildx ls
 
+            echo "=== Docker Login ==="
             docker login -u $DOCKER_USER -p $DOCKER_PASS
 
+            echo "=== Building Image ==="
             docker buildx build \
               --builder ci-builder \
               --cache-from=type=registry,ref=${DOCKER_REGISTRY}/frontend:cache \
