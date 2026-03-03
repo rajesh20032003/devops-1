@@ -483,6 +483,7 @@ pipeline {
             )]) {
               sh '''
                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                docker pull $DOCKER_USER/frontend:ci-${BUILD_NUMBER}
                 docker tag $DOCKER_USER/frontend:ci-${BUILD_NUMBER} $DOCKER_USER/frontend:${IMAGE_TAG}
                 docker push $DOCKER_USER/frontend:${IMAGE_TAG}
               '''
@@ -511,6 +512,7 @@ pipeline {
             )]) {
               sh '''
                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                docker pull $DOCKER_USER/gateway:ci-${BUILD_NUMBER}
                 docker tag $DOCKER_USER/gateway:ci-${BUILD_NUMBER} $DOCKER_USER/gateway:${IMAGE_TAG}
                 docker push $DOCKER_USER/gateway:${IMAGE_TAG}
               '''
@@ -539,6 +541,7 @@ pipeline {
             )]) {
               sh '''
                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                docker pull $DOCKER_USER/user-service:ci-${BUILD_NUMBER}
                 docker tag $DOCKER_USER/user-service:ci-${BUILD_NUMBER} $DOCKER_USER/user-service:${IMAGE_TAG}
                 docker push $DOCKER_USER/user-service:${IMAGE_TAG}
               '''
@@ -567,6 +570,7 @@ pipeline {
             )]) {
               sh '''
                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                docker pull $DOCKER_USER/order-service:ci-${BUILD_NUMBER}
                 docker tag $DOCKER_USER/order-service:ci-${BUILD_NUMBER} $DOCKER_USER/order-service:${IMAGE_TAG}
                 docker push $DOCKER_USER/order-service:${IMAGE_TAG}
               '''
