@@ -302,7 +302,7 @@ stage('Set Image Version') {
    stage('Build & Push Frontend') {
       agent {
         docker {
-          image 'docker:24-cli'
+          image 'docker:28-cli'
           args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
         }
       }
