@@ -48,6 +48,7 @@ pipeline {
   }
 }
     stage('Quality Checks') {
+      when {branch 'master'}
       parallel {
 
         stage('Gateway') {
@@ -144,6 +145,7 @@ pipeline {
     }
 
    stage('SonarQube Analysis') {
+    when {branch 'master'}
     agent any
     environment {
       SONAR_TOKEN = credentials('sonar-token')
@@ -184,6 +186,7 @@ pipeline {
   }
 
 stage('Quality Gate') {
+  when {branch 'master'}
   agent any
   steps {
     withSonarQubeEnv('sonarqube') {
@@ -277,12 +280,13 @@ stage('Set Image Version') {
     }
 
     stage('Trivy Scan') {
-      when {
-        anyOf {
-          //branch 'main'
-          buildingTag()
-        }
-      }
+      when {branch 'master'}
+      // when {
+      //   anyOf {
+      //     //branch 'main'
+      //     buildingTag()
+      //   }
+      // }
       agent any
       steps {
         sh '''
@@ -326,12 +330,13 @@ stage('Set Image Version') {
       }
     }
     stage('Push Images') {
-        when {
-          anyOf {
-            //branch 'main'
-            buildingTag()
-          }
-        }
+      when {branch 'master'}
+        // when {
+        //   anyOf {
+        //     //branch 'main'
+        //     buildingTag()
+        //   }
+        // }
 
         parallel {
 
