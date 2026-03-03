@@ -194,8 +194,23 @@ stage('Quality Gate') {
     }
   }
 }
+script {
+    if (env.TAG_NAME) {
+        env.IMAGE_TAG = env.TAG_NAME
+        echo "Release build detected. Version: ${env.IMAGE_TAG}"
+    } else {
+        env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
+        echo "Non-release build. Using dev tag: ${env.IMAGE_TAG}"
+    }
+}
+
     stage('Build Images!') {
-      when {branch 'main'}
+      when {
+        anyof {
+          //branch 'main'
+          buildingTag()
+        }
+      }
       parallel {
 
         stage('Build Frontend') {
@@ -206,7 +221,6 @@ stage('Quality Gate') {
               docker build \
                 --cache-from ${DOCKER_REGISTRY}/frontend:latest \
                 -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} \
-                -t ${DOCKER_REGISTRY}/frontend:latest \
                 ./frontend
             """
           }
@@ -220,7 +234,6 @@ stage('Quality Gate') {
               docker build \
                 --cache-from ${DOCKER_REGISTRY}/gateway:latest \
                 -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} \
-                -t ${DOCKER_REGISTRY}/gateway:latest \
                 ./gateway
             """
           }
@@ -234,7 +247,6 @@ stage('Quality Gate') {
               docker build \
                 --cache-from ${DOCKER_REGISTRY}/user-service:latest \
                 -t ${DOCKER_REGISTRY}/user-service:${IMAGE_TAG} \
-                -t ${DOCKER_REGISTRY}/user-service:latest \
                 ./user-service
             """
           }
@@ -248,7 +260,6 @@ stage('Quality Gate') {
               docker build \
                 --cache-from ${DOCKER_REGISTRY}/order-service:latest \
                 -t ${DOCKER_REGISTRY}/order-service:${IMAGE_TAG} \
-                -t ${DOCKER_REGISTRY}/order-service:latest \
                 ./order-service
             """
           }
