@@ -299,11 +299,11 @@ stage('Set Image Version') {
         '''
       }
     }
-    stage('Build & Push Frontend') {
+   stage('Build & Push Frontend') {
       agent {
         docker {
           image 'docker:24-cli'
-          args '-v /var/run/docker.sock:/var/run/docker.sock'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
         }
       }
       steps {
@@ -312,7 +312,7 @@ stage('Set Image Version') {
           usernameVariable: 'DOCKER_USER',
           passwordVariable: 'DOCKER_PASS'
         )]) {
-          sh """
+          sh '''
             export DOCKER_BUILDKIT=1
 
             echo "=== DEBUG: Buildx Available ==="
@@ -320,17 +320,17 @@ stage('Set Image Version') {
             docker buildx ls
 
             echo "=== Docker Login ==="
-            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker login -u "$DOCKER_USER" -p "$DOCKER_PASS"
 
             echo "=== Building Image ==="
             docker buildx build \
               --builder ci-builder \
-              --cache-from=type=registry,ref=${DOCKER_REGISTRY}/frontend:cache \
-              --cache-to=type=registry,ref=${DOCKER_REGISTRY}/frontend:cache,mode=max \
-              -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} \
+              --cache-from=type=registry,ref=${DOCKER_USER}/frontend:cache \
+              --cache-to=type=registry,ref=${DOCKER_USER}/frontend:cache,mode=max \
+              -t ${DOCKER_USER}/frontend:dev-${BUILD_NUMBER} \
               --push \
               ./frontend
-          """
+          '''
     }
   }
 }
