@@ -206,7 +206,7 @@ script {
 
     stage('Build Images!') {
       when {
-        anyof {
+        anyOf {
           //branch 'main'
           buildingTag()
         }
