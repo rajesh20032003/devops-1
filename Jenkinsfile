@@ -317,7 +317,6 @@ stage('Set Image Version') {
         )]) {
           sh """
             docker login -u $DOCKER_USER -p $DOCKER_PASS
-
             docker buildx build \
               --builder ci-builder \
               --cache-from=type=registry,ref=${DOCKER_REGISTRY}/frontend:cache \
@@ -325,7 +324,7 @@ stage('Set Image Version') {
               -t ${DOCKER_REGISTRY}/frontend:${IMAGE_TAG} \
               --push \
               ./frontend
-          """
+            """
         }
       }
     }
