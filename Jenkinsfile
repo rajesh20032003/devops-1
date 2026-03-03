@@ -53,8 +53,10 @@ pipeline {
 
         stage('Gateway') {
           when { 
-            changeset "**/gateway/**"
-            changeset "Jenkinsfile"
+            anyOf{
+               changeset "**/gateway/**"
+               changeset "null"
+            }
            }
           agent {
             docker {
@@ -79,10 +81,12 @@ pipeline {
         }
 
         stage('User Service') {
-          when { 
-            changeset "**/user-service/**"
-            changeset "Jenkinsfile"
-             }
+           when { 
+            anyOf{
+               changeset "**/user-service/**"
+               changeset "null"
+            }
+           }
           agent {
             docker {
               image 'node:22-alpine'
@@ -107,9 +111,11 @@ pipeline {
 
         stage('Order Service') {
           when { 
-            changeset "**/order-service/**"
-            changeset "Jenkinsfile"
-             }
+            anyOf{
+               changeset "**/order-service/**"
+               changeset "null"
+            }
+           }
           agent {
             docker {
               image 'node:22-alpine'
@@ -135,8 +141,9 @@ pipeline {
 
         stage('Frontend') {
           when { 
-                 changeset "**/frontend/**"
-                 changeset "Jenkinsfile"
+            anyOf{
+               changeset "**/frontend/**"
+            }
            }
           agent {
             docker {
@@ -163,7 +170,6 @@ pipeline {
               changeset "order-service/**"
               changeset "user-service/**"
               changeset "frontend/**"
-              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -212,7 +218,6 @@ pipeline {
               changeset "order-service/**"
               changeset "user-service/**"
               changeset "frontend/**"
-              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -233,8 +238,7 @@ pipeline {
           changeset "order-service/**"
           changeset "user-service/**"
           changeset "frontend/**"
-          changeset "Jenkinsfile"
-          //branch 'main'
+          branch 'main'
           buildingTag()
 
         }
@@ -260,7 +264,6 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
-              changeset "Jenkinsfile"
               buildingTag()
             }
           }
@@ -297,7 +300,7 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -334,7 +337,7 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -371,7 +374,7 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -414,7 +417,7 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -437,7 +440,7 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -460,7 +463,7 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -483,7 +486,7 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -512,7 +515,7 @@ pipeline {
           when {
             anyOf {
               changeset "frontend/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -542,7 +545,7 @@ pipeline {
           when {
             anyOf {
               changeset "gateway/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -572,7 +575,7 @@ pipeline {
           when {
             anyOf {
               changeset "user-service/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
@@ -602,7 +605,7 @@ pipeline {
           when {
             anyOf {
               changeset "order-service/**"
-              changeset "Jenkinsfile"
+              changeset "null"
               buildingTag()
             }
           }
