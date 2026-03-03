@@ -199,7 +199,7 @@ stage('Quality Gate') {
 stage('Set Image Version') {
    when {
         anyOf {
-          //branch 'main'
+          branch 'main'
           buildingTag()
         }
       }
