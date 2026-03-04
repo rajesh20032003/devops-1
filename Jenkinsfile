@@ -66,12 +66,22 @@ pipeline {
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
             --scanners vuln \
-            --vuln-type library
+            --pkg-types library \
+            --format json \
+            --output trivy-deps-report.json
         '''
   }
+  post {
+        always {
+          archiveArtifacts artifacts: 'trivy-deps-report.json', allowEmptyArchive: true
+        }
+        failure {
+          echo "CRITICAL: Secrets detected in repo!"
+        }
+      }
 }
 
-    stage('Quality Checks-npm ci,lint,unit test') {
+    stage('Quality Checks-lint,unit test') {
       parallel {
 
         stage('Gateway') {
