@@ -295,41 +295,49 @@ pipeline {
       parallel {
 
         stage('Build Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
-          steps {
-             withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                EC2_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com/frontend
-                aws ecr get-login-password --region ap-south-1 \
-                | docker login \
-                --username AWS \
-                --password-stdin 760302898980.dkr.ecr.ap-south-1.amazonaws.com/frontend
-                docker buildx build \
-                --builder ci-builder \
-                --cache-from=type=registry,ref=$ECR_REGISTRY/frontend:buildcache \
-                --cache-to=type=registry,ref=$ECR_REGISTRY/frontend:buildcache,mode=max \
-                -t $ECR_REGISTRY/frontend:ci-${BUILD_NUMBER} \
-                --push \
-                ./frontend
-              '''
-            }
-          }
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
         }
+      }
+
+      agent {
+        docker {
+          image 'docker:28-cli'
+          args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
+        }
+      }
+
+      steps {
+
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+
+          sh '''
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            REPO_NAME=frontend
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            aws ecr get-login-password --region ap-south-1 \
+            | docker login \
+            --username AWS \
+            --password-stdin $ECR_REGISTRY
+
+            docker buildx build \
+            --builder ci-builder \
+            --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
+            --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
+            -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
+            --push \
+            ./frontend
+          '''
+        }
+      }
+    }
 
         stage('Build Gateway') {
           when {
