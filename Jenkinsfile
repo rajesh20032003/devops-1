@@ -326,7 +326,8 @@ pipeline {
             | docker login \
             --username AWS \
             --password-stdin $ECR_REGISTRY
-
+            docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
             docker buildx build \
             --builder ci-builder \
             --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
