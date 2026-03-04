@@ -314,11 +314,11 @@ pipeline {
               credentialsId: 'aws-ecr-credentials'
             ]]) {
               sh '''
-                EC2_REGISTRY=123456789012.dkr.ecr.ap-south-1.amazonaws.com
+                EC2_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com/frontend
                 aws ecr get-login-password --region ap-south-1 \
                 | docker login \
                 --username AWS \
-                --password-stdin 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+                --password-stdin 760302898980.dkr.ecr.ap-south-1.amazonaws.com/frontend
                 docker buildx build \
                 --builder ci-builder \
                 --cache-from=type=registry,ref=$ECR_REGISTRY/gateway:buildcache \
