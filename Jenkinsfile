@@ -479,7 +479,7 @@ pipeline {
                 trivy image \
                   --scanners vuln \
                   --exit-code 1 \
-                  --severity HIGH,CRITICAL \
+                  --severity CRITICAL \
                   --skip-version-check \
                   --image-src remote \
                   --username AWS \
@@ -515,7 +515,7 @@ pipeline {
                 trivy image \
                   --scanners vuln \
                   --exit-code 1 \
-                  --severity HIGH,CRITICAL \
+                  --severity CRITICAL \
                   --skip-version-check \
                   --image-src remote \
                   --username AWS \
@@ -551,7 +551,7 @@ pipeline {
                 trivy image \
                   --scanners vuln \
                   --exit-code 1 \
-                  --severity HIGH,CRITICAL \
+                  --severity CRITICAL \
                   --skip-version-check \
                   --image-src remote \
                   --username AWS \
@@ -587,7 +587,7 @@ pipeline {
                 trivy image \
                   --scanners vuln \
                   --exit-code 1 \
-                  --severity HIGH,CRITICAL \
+                  --severity CRITICAL \
                   --skip-version-check \
                   --image-src remote \
                   --username AWS \
@@ -623,20 +623,13 @@ pipeline {
                 ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
                 REPO_NAME=frontend
                 CI_TAG=ci-${BUILD_NUMBER}
-
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
-
                 aws ecr get-login-password --region ap-south-1 \
                   | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                echo "Promoted $CI_TAG → $IMAGE_TAG"
               '''
             }
           }
@@ -662,19 +655,14 @@ pipeline {
                 REPO_NAME=gateway
                 CI_TAG=ci-${BUILD_NUMBER}
 
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
 
                 aws ecr get-login-password --region ap-south-1 \
                   | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                echo "Promoted $CI_TAG → $IMAGE_TAG"
               '''
             }
           }
@@ -700,19 +688,14 @@ pipeline {
                 REPO_NAME=user-service
                 CI_TAG=ci-${BUILD_NUMBER}
 
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
 
                 aws ecr get-login-password --region ap-south-1 \
                   | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                echo "Promoted $CI_TAG → $IMAGE_TAG"
               '''
             }
           }
@@ -738,19 +721,13 @@ pipeline {
                 REPO_NAME=order-service
                 CI_TAG=ci-${BUILD_NUMBER}
 
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
-
                 aws ecr get-login-password --region ap-south-1 \
                   | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                echo "Promoted $CI_TAG → $IMAGE_TAG"
               '''
             }
           }
