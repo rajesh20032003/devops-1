@@ -605,35 +605,35 @@ pipeline {
       }
     }
     stage('Generate SBOM') {
-  parallel {
+      parallel {
 
-    stage('SBOM Frontend') {
-      when {
-        anyOf {
-          changeset "frontend/**"
-          buildingTag()
-          branch 'main'
+        stage('SBOM Frontend') {
+          when {
+            anyOf {
+              changeset "frontend/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
+              sh '''
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+                syft $ECR_REGISTRY/frontend:ci-${BUILD_NUMBER} \
+                  -o cyclonedx-json > sbom-frontend.json
+              '''
+              archiveArtifacts artifacts: 'sbom-frontend.json'
+            }
+          }
         }
-      }
-      agent any
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-ecr-credentials'
-        ]]) {
-          sh '''
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-            syft $ECR_REGISTRY/frontend:ci-${BUILD_NUMBER} \
-              -o cyclonedx-json > sbom-frontend.json
-          '''
-          archiveArtifacts artifacts: 'sbom-frontend.json'
-        }
-      }
-    }
 
     stage('SBOM Gateway') {
       when {
