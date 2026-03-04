@@ -464,23 +464,22 @@ pipeline {
               credentialsId: 'aws-ecr-credentials'
             ]]) {
               sh '''
-                set -x
+                  set -x
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=frontend
-                IMAGE_TAG=ci-${BUILD_NUMBER}
+                  ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                  REPO_NAME=frontend
+                  IMAGE_TAG=ci-${BUILD_NUMBER}
 
-                # ✅ Get ECR token and pass it to Trivy via env vars
-                export TRIVY_USERNAME=AWS
-                export TRIVY_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
+                  ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
 
-                trivy image \
-                  --scanners vuln \
-                  --exit-code 1 \
-                  --severity HIGH,CRITICAL \
-                  --skip-version-check \
-                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-              '''
+                  trivy image \
+                    --scanners vuln \
+                    --exit-code 1 \
+                    --severity HIGH,CRITICAL \
+                    --skip-version-check \
+                    --registry-creds AWS:$ECR_PASSWORD \
+                    $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+                '''
             }
           }
         }
