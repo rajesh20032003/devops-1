@@ -318,6 +318,8 @@ pipeline {
         ]]) {
 
           sh '''
+            echo "===="
+            apk add --no-cache aws-cli
             ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
             REPO_NAME=frontend
             IMAGE_TAG=ci-${BUILD_NUMBER}
