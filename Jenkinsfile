@@ -48,6 +48,15 @@ pipeline {
       }
     }
     stage('Dependency Scan (Trivy Repo)') {
+      when {
+            anyOf {
+              changeset "gateway/**"
+              changeset "order-service/**"
+              changeset "user-service/**"
+              changeset "frontend/**"
+              buildingTag()
+            }
+          }
       agent any
       steps {
         sh '''
@@ -62,7 +71,7 @@ pipeline {
   }
 }
 
-    stage('Quality Checks') {
+    stage('Quality Checks-npm ci,lint,unit test') {
       parallel {
 
         stage('Gateway') {
@@ -226,7 +235,7 @@ pipeline {
       }
     }
 
-    stage('Quality Gate') {
+    stage('Quality Gate-sonarqube') {
        when {
             anyOf {
               changeset "gateway/**"
@@ -272,7 +281,7 @@ pipeline {
       }
     }
 
-    stage('Build and Push Images!') {
+    stage('Build and Push Images by buildKit') {
       parallel {
 
         stage('Build Frontend') {
