@@ -564,27 +564,38 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                docker pull $DOCKER_USER/frontend:ci-${BUILD_NUMBER}
-                docker tag $DOCKER_USER/frontend:ci-${BUILD_NUMBER} $DOCKER_USER/frontend:${IMAGE_TAG}
-                docker push $DOCKER_USER/frontend:${IMAGE_TAG}
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=frontend
+                CI_TAG=ci-${BUILD_NUMBER}
+
+                # Use git tag if building a tag, otherwise use dev-BUILD_NUMBER
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+
+                echo "Promoted $CI_TAG → $FINAL_TAG"
               '''
-            }
-          }
-        }
+    }
+  }
+}
 
         stage('Promote Gateway') {
           when {
