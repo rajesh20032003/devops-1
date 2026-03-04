@@ -47,16 +47,17 @@ pipeline {
         }
       }
     }
+
     stage('Dependency Scan (Trivy Repo)') {
       when {
-            anyOf {
-              changeset "gateway/**"
-              changeset "order-service/**"
-              changeset "user-service/**"
-              changeset "frontend/**"
-              buildingTag()
-            }
-          }
+        anyOf {
+          changeset "gateway/**"
+          changeset "order-service/**"
+          changeset "user-service/**"
+          changeset "frontend/**"
+          buildingTag()
+        }
+      }
       agent any
       steps {
         sh '''
@@ -70,8 +71,8 @@ pipeline {
             --format json \
             --output trivy-deps-report.json
         '''
-  }
-  post {
+      }
+      post {
         always {
           archiveArtifacts artifacts: 'trivy-deps-report.json', allowEmptyArchive: true
         }
@@ -79,18 +80,18 @@ pipeline {
           echo "CRITICAL: vulnerabilities founded in dependenicies!"
         }
       }
-}
+    }
 
     stage('Quality Checks-lint,unit test') {
       parallel {
 
         stage('Gateway') {
-          when { 
-            anyOf{
-               changeset "**/gateway/**"
-               buildingTag()
+          when {
+            anyOf {
+              changeset "**/gateway/**"
+              buildingTag()
             }
-           }
+          }
           agent {
             docker {
               image 'node:22-alpine'
@@ -114,12 +115,12 @@ pipeline {
         }
 
         stage('User Service') {
-           when { 
-            anyOf{
-               changeset "**/user-service/**"
-               buildingTag()
+          when {
+            anyOf {
+              changeset "**/user-service/**"
+              buildingTag()
             }
-           }
+          }
           agent {
             docker {
               image 'node:22-alpine'
@@ -143,12 +144,12 @@ pipeline {
         }
 
         stage('Order Service') {
-          when { 
-            anyOf{
-               changeset "**/order-service/**"
-               buildingTag()
+          when {
+            anyOf {
+              changeset "**/order-service/**"
+              buildingTag()
             }
-           }
+          }
           agent {
             docker {
               image 'node:22-alpine'
@@ -173,12 +174,12 @@ pipeline {
         }
 
         stage('Frontend') {
-          when { 
-            anyOf{
-               changeset "**/frontend/**"
-               buildingTag()
+          when {
+            anyOf {
+              changeset "**/frontend/**"
+              buildingTag()
             }
-           }
+          }
           agent {
             docker {
               image 'node:22-alpine'
@@ -199,14 +200,14 @@ pipeline {
 
     stage('SonarQube Analysis') {
       when {
-            anyOf {
-              changeset "gateway/**"
-              changeset "order-service/**"
-              changeset "user-service/**"
-              changeset "frontend/**"
-              buildingTag()
-            }
-          }
+        anyOf {
+          changeset "gateway/**"
+          changeset "order-service/**"
+          changeset "user-service/**"
+          changeset "frontend/**"
+          buildingTag()
+        }
+      }
       agent any
       environment {
         SONAR_TOKEN = credentials('sonar-token')
@@ -246,15 +247,15 @@ pipeline {
     }
 
     stage('Quality Gate-sonarqube') {
-       when {
-            anyOf {
-              changeset "gateway/**"
-              changeset "order-service/**"
-              changeset "user-service/**"
-              changeset "frontend/**"
-              buildingTag()
-            }
-          }
+      when {
+        anyOf {
+          changeset "gateway/**"
+          changeset "order-service/**"
+          changeset "user-service/**"
+          changeset "frontend/**"
+          buildingTag()
+        }
+      }
       agent any
       steps {
         withSonarQubeEnv('sonarqube') {
@@ -274,7 +275,6 @@ pipeline {
           changeset "frontend/**"
           branch 'main'
           buildingTag()
-
         }
       }
       agent any
@@ -291,7 +291,7 @@ pipeline {
       }
     }
 
-    stage('Build and Push Images by buildKit') {
+    stage('Build and Push Images') {
       parallel {
 
         stage('Build Frontend') {
@@ -302,23 +302,21 @@ pipeline {
               branch 'main'
             }
           }
-          agent any  // ← runs on host directly, uses host's aws-cli and docker
+          agent any
           steps {
             withCredentials([[
               $class: 'AmazonWebServicesCredentialsBinding',
               credentialsId: 'aws-ecr-credentials'
             ]]) {
               sh '''
-                set -x  // ← enables verbose logging so you can see what fails
+                set -x
 
                 ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
                 REPO_NAME=frontend
                 IMAGE_TAG=ci-${BUILD_NUMBER}
 
                 aws ecr get-login-password --region ap-south-1 \
-                  | docker login \
-                    --username AWS \
-                    --password-stdin $ECR_REGISTRY
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
                 docker buildx inspect --bootstrap
@@ -342,28 +340,30 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                CI_TAG="ci-${BUILD_NUMBER}"
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=gateway
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
                 docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
                 docker buildx inspect --bootstrap
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                 docker buildx build \
                   --builder ci-builder \
-                  --cache-from=type=registry,ref=$DOCKER_USER/gateway:cache \
-                  --cache-to=type=registry,ref=$DOCKER_USER/gateway:cache,mode=max \
-                  -t $DOCKER_USER/gateway:${CI_TAG} \
+                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
+                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
+                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
                   --push \
                   ./gateway
               '''
@@ -378,28 +378,30 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                CI_TAG="ci-${BUILD_NUMBER}"
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=user-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
                 docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
                 docker buildx inspect --bootstrap
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                 docker buildx build \
                   --builder ci-builder \
-                  --cache-from=type=registry,ref=$DOCKER_USER/user-service:cache \
-                  --cache-to=type=registry,ref=$DOCKER_USER/user-service:cache,mode=max \
-                  -t $DOCKER_USER/user-service:${CI_TAG} \
+                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
+                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
+                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
                   --push \
                   ./user-service
               '''
@@ -414,28 +416,30 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                CI_TAG="ci-${BUILD_NUMBER}"
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=order-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
                 docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
                 docker buildx inspect --bootstrap
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                 docker buildx build \
                   --builder ci-builder \
-                  --cache-from=type=registry,ref=$DOCKER_USER/order-service:cache \
-                  --cache-to=type=registry,ref=$DOCKER_USER/order-service:cache,mode=max \
-                  -t $DOCKER_USER/order-service:${CI_TAG} \
+                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
+                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
+                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
                   --push \
                   ./order-service
               '''
@@ -485,6 +489,7 @@ pipeline {
             }
           }
         }
+
         stage('Scan Gateway') {
           when {
             anyOf {
@@ -494,36 +499,28 @@ pipeline {
           }
           agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                trivy image --cache-dir $WORKSPACE/.trivy-gateway --scanners vuln --exit-code 1 --severity CRITICAL \
-                  $DOCKER_USER/gateway:ci-${BUILD_NUMBER}
-              '''
-            }
-          }
-        }
+                set -x
 
-        stage('Scan Order Service') {
-          when {
-            anyOf {
-              changeset "order-service/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
-              sh '''
-                trivy image --cache-dir $WORKSPACE/.trivy-order-service --scanners vuln --exit-code 1 --severity CRITICAL \
-                  $DOCKER_USER/order-service:ci-${BUILD_NUMBER}
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=gateway
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity HIGH,CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --username AWS \
+                  --password $ECR_PASSWORD \
+                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
               '''
             }
           }
@@ -538,14 +535,64 @@ pipeline {
           }
           agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                trivy image --cache-dir $WORKSPACE/.trivy-user-service --scanners vuln --exit-code 1 --severity CRITICAL \
-                  $DOCKER_USER/user-service:ci-${BUILD_NUMBER}
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=user-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity HIGH,CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --username AWS \
+                  --password $ECR_PASSWORD \
+                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
+              '''
+            }
+          }
+        }
+
+        stage('Scan Order Service') {
+          when {
+            anyOf {
+              changeset "order-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
+              sh '''
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=order-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity HIGH,CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --username AWS \
+                  --password $ECR_PASSWORD \
+                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
               '''
             }
           }
@@ -577,7 +624,6 @@ pipeline {
                 REPO_NAME=frontend
                 CI_TAG=ci-${BUILD_NUMBER}
 
-                # Use git tag if building a tag, otherwise use dev-BUILD_NUMBER
                 if [ -n "$TAG_NAME" ]; then
                   FINAL_TAG=$TAG_NAME
                 else
@@ -588,13 +634,13 @@ pipeline {
                   | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:${IMAGE_TAG}
-                docker push $ECR_REGISTRY/$REPO_NAME:${IMAGE_TAG}
-                echo "Promoted $CI_TAG → ${IMAGE_TAG}"
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
               '''
-    }
-  }
-}
+            }
+          }
+        }
 
         stage('Promote Gateway') {
           when {
@@ -603,23 +649,32 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                docker pull $DOCKER_USER/gateway:ci-${BUILD_NUMBER}
-                docker tag $DOCKER_USER/gateway:ci-${BUILD_NUMBER} $DOCKER_USER/gateway:${IMAGE_TAG}
-                docker push $DOCKER_USER/gateway:${IMAGE_TAG}
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=gateway
+                CI_TAG=ci-${BUILD_NUMBER}
+
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
               '''
             }
           }
@@ -632,23 +687,32 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                docker pull $DOCKER_USER/user-service:ci-${BUILD_NUMBER}
-                docker tag $DOCKER_USER/user-service:ci-${BUILD_NUMBER} $DOCKER_USER/user-service:${IMAGE_TAG}
-                docker push $DOCKER_USER/user-service:${IMAGE_TAG}
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=user-service
+                CI_TAG=ci-${BUILD_NUMBER}
+
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
               '''
             }
           }
@@ -661,23 +725,32 @@ pipeline {
               buildingTag()
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                docker pull $DOCKER_USER/order-service:ci-${BUILD_NUMBER}
-                docker tag $DOCKER_USER/order-service:ci-${BUILD_NUMBER} $DOCKER_USER/order-service:${IMAGE_TAG}
-                docker push $DOCKER_USER/order-service:${IMAGE_TAG}
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=order-service
+                CI_TAG=ci-${BUILD_NUMBER}
+
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
               '''
             }
           }
