@@ -302,18 +302,15 @@ pipeline {
               branch 'main'
             }
           }
-          agent {
-            docker {
-              image 'docker:28-cli'
-              args '-v /var/run/docker.sock:/var/run/docker.sock -e HOME=/tmp'
-            }
-          }
+          agent any  // ← runs on host directly, uses host's aws-cli and docker
           steps {
             withCredentials([[
               $class: 'AmazonWebServicesCredentialsBinding',
               credentialsId: 'aws-ecr-credentials'
             ]]) {
               sh '''
+                set -x  // ← enables verbose logging so you can see what fails
+
                 ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
                 REPO_NAME=frontend
                 IMAGE_TAG=ci-${BUILD_NUMBER}
@@ -334,9 +331,9 @@ pipeline {
                   --push \
                   ./frontend
               '''
-    }
-  }
-}
+            }
+          }
+        }
 
         stage('Build Gateway') {
           when {
