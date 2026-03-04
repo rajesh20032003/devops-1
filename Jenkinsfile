@@ -76,7 +76,7 @@ pipeline {
           archiveArtifacts artifacts: 'trivy-deps-report.json', allowEmptyArchive: true
         }
         failure {
-          echo "CRITICAL: Secrets detected in repo!"
+          echo "CRITICAL: vulnerabilities founded in dependenicies!"
         }
       }
 }
@@ -299,6 +299,7 @@ pipeline {
             anyOf {
               changeset "frontend/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent {
@@ -308,23 +309,23 @@ pipeline {
             }
           }
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+             withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                CI_TAG="ci-${BUILD_NUMBER}"
-                docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
-                docker buildx inspect --bootstrap
-                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                EC2_REGISTRY=123456789012.dkr.ecr.ap-south-1.amazonaws.com
+                aws ecr get-login-password --region ap-south-1 \
+                | docker login \
+                --username AWS \
+                --password-stdin 123456789012.dkr.ecr.ap-south-1.amazonaws.com
                 docker buildx build \
-                  --builder ci-builder \
-                  --cache-from=type=registry,ref=$DOCKER_USER/frontend:cache \
-                  --cache-to=type=registry,ref=$DOCKER_USER/frontend:cache,mode=max \
-                  -t $DOCKER_USER/frontend:${CI_TAG} \
-                  --push \
-                  ./frontend
+                --builder ci-builder \
+                --cache-from=type=registry,ref=$ECR_REGISTRY/gateway:buildcache \
+                --cache-to=type=registry,ref=$ECR_REGISTRY/gateway:buildcache,mode=max \
+                -t $ECR_REGISTRY/gateway:ci-${BUILD_NUMBER} \
+                --push \
+                ./gateway
               '''
             }
           }
