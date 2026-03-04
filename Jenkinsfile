@@ -47,6 +47,20 @@ pipeline {
         }
       }
     }
+    stage('Dependency Scan (Trivy Repo)') {
+      agent any
+      steps {
+        sh '''
+          trivy fs . \
+            --exit-code 1 \
+            --no-progress \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            --scanners vuln \
+            --vuln-type library
+        '''
+  }
+}
 
     stage('Quality Checks') {
       parallel {
