@@ -55,6 +55,7 @@ pipeline {
           when { 
             anyOf{
                changeset "**/gateway/**"
+               buildingTag()
             }
            }
           agent {
@@ -83,6 +84,7 @@ pipeline {
            when { 
             anyOf{
                changeset "**/user-service/**"
+               buildingTag()
             }
            }
           agent {
@@ -111,6 +113,7 @@ pipeline {
           when { 
             anyOf{
                changeset "**/order-service/**"
+               buildingTag()
             }
            }
           agent {
@@ -140,6 +143,7 @@ pipeline {
           when { 
             anyOf{
                changeset "**/frontend/**"
+               buildingTag()
             }
            }
           agent {
@@ -254,7 +258,7 @@ pipeline {
       }
     }
 
-    stage('Build and Push Images') {
+    stage('Build and Push Images!') {
       parallel {
 
         stage('Build Frontend') {
