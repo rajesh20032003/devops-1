@@ -321,11 +321,11 @@ pipeline {
                 --password-stdin 760302898980.dkr.ecr.ap-south-1.amazonaws.com/frontend
                 docker buildx build \
                 --builder ci-builder \
-                --cache-from=type=registry,ref=$ECR_REGISTRY/gateway:buildcache \
-                --cache-to=type=registry,ref=$ECR_REGISTRY/gateway:buildcache,mode=max \
-                -t $ECR_REGISTRY/gateway:ci-${BUILD_NUMBER} \
+                --cache-from=type=registry,ref=$ECR_REGISTRY/frontend:buildcache \
+                --cache-to=type=registry,ref=$ECR_REGISTRY/frontend:buildcache,mode=max \
+                -t $ECR_REGISTRY/frontend:ci-${BUILD_NUMBER} \
                 --push \
-                ./gateway
+                ./frontend
               '''
             }
           }
