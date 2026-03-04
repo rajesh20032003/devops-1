@@ -470,21 +470,20 @@ pipeline {
                 REPO_NAME=frontend
                 IMAGE_TAG=ci-${BUILD_NUMBER}
 
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login \
-                    --username AWS \
-                    --password-stdin $ECR_REGISTRY
+                # ✅ Get ECR token and pass it to Trivy via env vars
+                export TRIVY_USERNAME=AWS
+                export TRIVY_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
 
                 trivy image \
                   --scanners vuln \
                   --exit-code 1 \
                   --severity HIGH,CRITICAL \
+                  --skip-version-check \
                   $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
               '''
             }
-  }
-}
-
+          }
+        }
         stage('Scan Gateway') {
           when {
             anyOf {
