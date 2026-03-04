@@ -588,10 +588,9 @@ pipeline {
                   | docker login --username AWS --password-stdin $ECR_REGISTRY
 
                 docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$FINAL_TAG
-
-                echo "Promoted $CI_TAG → $FINAL_TAG"
+                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:${IMAGE_TAG}
+                docker push $ECR_REGISTRY/$REPO_NAME:${IMAGE_TAG}
+                echo "Promoted $CI_TAG → ${IMAGE_TAG}"
               '''
     }
   }
