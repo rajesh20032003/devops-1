@@ -478,6 +478,7 @@ pipeline {
 
                 trivy image \
                   --scanners vuln \
+                  --download-db-only --cache-dir $HOME/.trivy \
                   --exit-code 1 \
                   --severity CRITICAL \
                   --skip-version-check \
@@ -514,6 +515,7 @@ pipeline {
 
                 trivy image \
                   --scanners vuln \
+                  --download-db-only --cache-dir $HOME/.trivy \
                   --exit-code 1 \
                   --severity CRITICAL \
                   --skip-version-check \
@@ -550,6 +552,7 @@ pipeline {
 
                 trivy image \
                   --scanners vuln \
+                  --download-db-only --cache-dir $HOME/.trivy \
                   --exit-code 1 \
                   --severity CRITICAL \
                   --skip-version-check \
@@ -586,6 +589,7 @@ pipeline {
 
                 trivy image \
                   --scanners vuln \
+                  --download-db-only --cache-dir $HOME/.trivy \
                   --exit-code 1 \
                   --severity CRITICAL \
                   --skip-version-check \
@@ -600,6 +604,120 @@ pipeline {
 
       }
     }
+    stage('Generate SBOM') {
+  parallel {
+
+    stage('SBOM Frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          sh '''
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            syft $ECR_REGISTRY/frontend:ci-${BUILD_NUMBER} \
+              -o cyclonedx-json > sbom-frontend.json
+          '''
+          archiveArtifacts artifacts: 'sbom-frontend.json'
+        }
+      }
+    }
+
+    stage('SBOM Gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          sh '''
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            syft $ECR_REGISTRY/gateway:ci-${BUILD_NUMBER} \
+              -o cyclonedx-json > sbom-gateway.json
+          '''
+          archiveArtifacts artifacts: 'sbom-gateway.json'
+        }
+      }
+    }
+
+    stage('SBOM User Service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          sh '''
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            syft $ECR_REGISTRY/user-service:ci-${BUILD_NUMBER} \
+              -o cyclonedx-json > sbom-user-service.json
+          '''
+          archiveArtifacts artifacts: 'sbom-user-service.json'
+        }
+      }
+    }
+
+    stage('SBOM Order Service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          sh '''
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            syft $ECR_REGISTRY/order-service:ci-${BUILD_NUMBER} \
+              -o cyclonedx-json > sbom-order-service.json
+          '''
+          archiveArtifacts artifacts: 'sbom-order-service.json'
+        }
+      }
+    }
+
+  }
+}
 
     stage('Promote Images') {
       parallel {
