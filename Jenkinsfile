@@ -299,7 +299,7 @@ pipeline {
             anyOf {
               changeset "frontend/**"
               buildingTag()
-              branch 'main'
+              // branch 'main'
             }
           }
           agent any  // ← runs on host directly, uses host's aws-cli and docker
@@ -454,22 +454,36 @@ pipeline {
             anyOf {
               changeset "frontend/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
           steps {
-            withCredentials([usernamePassword(
-              credentialsId: 'docker-hub-credentials',
-              usernameVariable: 'DOCKER_USER',
-              passwordVariable: 'DOCKER_PASS'
-            )]) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: 'aws-ecr-credentials'
+            ]]) {
               sh '''
-                trivy image --cache-dir $WORKSPACE/.trivy-frontend --scanners vuln --exit-code 1 --severity CRITICAL \
-                  $DOCKER_USER/frontend:ci-${BUILD_NUMBER}
+                set -x
+
+                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+                REPO_NAME=frontend
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login \
+                    --username AWS \
+                    --password-stdin $ECR_REGISTRY
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity HIGH,CRITICAL \
+                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
               '''
             }
-          }
-        }
+  }
+}
 
         stage('Scan Gateway') {
           when {
