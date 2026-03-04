@@ -299,7 +299,7 @@ pipeline {
             anyOf {
               changeset "frontend/**"
               buildingTag()
-              // branch 'main'
+              branch 'main'
             }
           }
           agent any  // ← runs on host directly, uses host's aws-cli and docker
