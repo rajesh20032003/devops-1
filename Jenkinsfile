@@ -907,18 +907,17 @@ EOF
             echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
               -u "$HARBOR_USER" --password-stdin
 
-            # Upload each report as OCI artifact using oras
             # gitleaks report
             if [ -f gitleaks-report.json ]; then
               oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:gitleaks-${BUILD_NUMBER} \
-                --insecure \
+                --plain-http \
                 gitleaks-report.json:application/json
             fi
 
             # trivy dependency report
             if [ -f trivy-deps-report.json ]; then
               oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:trivy-deps-${BUILD_NUMBER} \
-                --insecure \
+                --plain-http \
                 trivy-deps-report.json:application/json
             fi
 
@@ -926,7 +925,7 @@ EOF
             for SERVICE in frontend gateway user-service order-service; do
               if [ -f sbom-${SERVICE}.json ]; then
                 oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:sbom-${SERVICE}-${BUILD_NUMBER} \
-                  --insecure \
+                  --plain-http \
                   sbom-${SERVICE}.json:application/json
               fi
             done
