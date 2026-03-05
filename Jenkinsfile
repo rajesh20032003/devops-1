@@ -49,6 +49,7 @@ pipeline {
       post {
         always {
           archiveArtifacts artifacts: 'gitleaks-report.json', allowEmptyArchive: true
+          stash name: 'gitleaks-report', includes: 'gitleaks-report.json', allowEmpty: true
         }
         failure {
           echo "CRITICAL: Secrets detected in repo!"
@@ -86,6 +87,7 @@ pipeline {
       post {
         always {
           archiveArtifacts artifacts: 'trivy-deps-report.json', allowEmptyArchive: true
+          stash name: 'trivy-deps-report', includes: 'trivy-deps-report.json', allowEmpty: true
         }
         failure {
           echo "CRITICAL: Vulnerabilities found in dependencies!"
@@ -124,6 +126,9 @@ pipeline {
             always {
               junit allowEmptyResults: true, testResults: 'gateway/coverage/junit.xml'
               recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
+              stash name: 'coverage-gateway',
+            includes: 'gateway/coverage/**',
+            allowEmpty: true
             }
           }
         }
@@ -153,6 +158,9 @@ pipeline {
             always {
               junit allowEmptyResults: true, testResults: 'user-service/coverage/junit.xml'
               recordCoverage tools: [[parser: 'LCOV', pattern: 'user-service/coverage/lcov.info']]
+              stash name: 'coverage-user-service',
+            includes: 'user-service/coverage/**',
+            allowEmpty: true
             }
           }
         }
@@ -183,6 +191,9 @@ pipeline {
             always {
               junit allowEmptyResults: true, testResults: 'order-service/coverage/junit.xml'
               recordCoverage tools: [[parser: 'LCOV', pattern: 'order-service/coverage/lcov.info']]
+              stash name: 'coverage-order-service',
+            includes: 'order-service/coverage/**',
+            allowEmpty: true
             }
           }
         }
@@ -744,6 +755,7 @@ EOF
           post {
             always {
               archiveArtifacts artifacts: 'sbom-frontend.json', allowEmptyArchive: true
+              stash name: 'sbom-frontend', includes: 'sbom-frontend.json', allowEmpty: true
             }
           }
         }
@@ -786,6 +798,7 @@ EOF
           post {
             always {
               archiveArtifacts artifacts: 'sbom-gateway.json', allowEmptyArchive: true
+              stash name: 'sbom-gateway', includes: 'sbom-gateway.json', allowEmpty: true
             }
           }
         }
@@ -870,6 +883,7 @@ EOF
           post {
             always {
               archiveArtifacts artifacts: 'sbom-order-service.json', allowEmptyArchive: true
+              stash name: 'sbom-gateway', includes: 'sbom-gateway.json', allowEmpty: true
             }
           }
         }
@@ -882,57 +896,63 @@ EOF
     // (gitleaks, trivy-deps, trivy-image, sbom)
     // ─────────────────────────────────────────────
     stage('Upload Reports to Harbor') {
-      when {
-        anyOf {
-          changeset "gateway/**"
-          changeset "order-service/**"
-          changeset "user-service/**"
-          changeset "frontend/**"
-          buildingTag()
+        when {
+          anyOf {
+            changeset "gateway/**"
+            changeset "order-service/**"
+            changeset "user-service/**"
+            changeset "frontend/**"
+            buildingTag()
+          }
         }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-            BUILD_TAG=build-${BUILD_NUMBER}
+        agent any
+        steps {
+          withCredentials([
+            usernamePassword(
+              credentialsId: 'harbor-credential',
+              usernameVariable: 'HARBOR_USER',
+              passwordVariable: 'HARBOR_PASS'
+            )
+          ]) {
+            sh 'mkdir -p reports'
 
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
+            // Unstash all reports
+            unstash 'gitleaks-report'
+            unstash 'trivy-deps-report'
+            unstash 'sbom-frontend'
+            unstash 'sbom-gateway'
+            unstash 'sbom-user-service'
+            unstash 'sbom-order-service'
 
-            # gitleaks report
-            if [ -f gitleaks-report.json ]; then
-              oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:gitleaks-${BUILD_NUMBER} \
-                --plain-http \
-                gitleaks-report.json:application/json
-            fi
+            sh '''
+              set -x
 
-            # trivy dependency report
-            if [ -f trivy-deps-report.json ]; then
-              oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:trivy-deps-${BUILD_NUMBER} \
-                --plain-http \
-                trivy-deps-report.json:application/json
-            fi
+              echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                -u "$HARBOR_USER" --password-stdin
 
-            # sbom reports
-            for SERVICE in frontend gateway user-service order-service; do
-              if [ -f sbom-${SERVICE}.json ]; then
-                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:sbom-${SERVICE}-${BUILD_NUMBER} \
+              if [ -f gitleaks-report.json ]; then
+                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:gitleaks-${BUILD_NUMBER} \
                   --plain-http \
-                  sbom-${SERVICE}.json:application/json
+                  gitleaks-report.json:application/json
               fi
-            done
-          '''
-        }
-      }
+
+              if [ -f trivy-deps-report.json ]; then
+                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:trivy-deps-${BUILD_NUMBER} \
+                  --plain-http \
+                  trivy-deps-report.json:application/json
+              fi
+
+              for SERVICE in frontend gateway user-service order-service; do
+                if [ -f sbom-${SERVICE}.json ]; then
+                  oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:sbom-${SERVICE}-${BUILD_NUMBER} \
+                    --plain-http \
+                    sbom-${SERVICE}.json:application/json
+                fi
+              done
+            '''
     }
+  }
+}
 
     // ─────────────────────────────────────────────
     // STAGE 12: Sign Images in Harbor
