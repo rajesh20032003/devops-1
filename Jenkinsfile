@@ -865,6 +865,7 @@ EOF
           post {
             always {
               archiveArtifacts artifacts: 'sbom-user-service.json', allowEmptyArchive: true
+              stash name: 'sbom-user-service', includes: 'sbom-user-service.json', allowEmpty: true
             }
           }
         }
@@ -907,7 +908,7 @@ EOF
           post {
             always {
               archiveArtifacts artifacts: 'sbom-order-service.json', allowEmptyArchive: true
-              stash name: 'sbom-gateway', includes: 'sbom-gateway.json', allowEmpty: true
+              stash name: 'sbom-order-service', includes: 'sbom-order-service.json', allowEmpty: true
             }
           }
         }
