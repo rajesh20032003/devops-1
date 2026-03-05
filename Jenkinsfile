@@ -314,36 +314,37 @@ pipeline {
             passwordVariable: 'HARBOR_PASS'
           )
         ]) {
-           sh '''
+          sh '''
         set -x
 
         IMAGE_TAG=ci-${BUILD_NUMBER}
-        SERVICE=frontend
+        SERVICE=order-service
+        BUILDER_NAME=ci-builder-${SERVICE}
 
         echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
           -u "$HARBOR_USER" --password-stdin
 
         mkdir -p /tmp/buildkit
-        cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+        cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-        docker buildx rm ci-builder || true
-        docker rm -f buildx_buildkit_ci-builder0 || true
+        docker buildx rm $BUILDER_NAME || true
+        docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
         docker buildx create \
-          --name ci-builder \
+          --name $BUILDER_NAME \
           --driver docker-container \
           --driver-opt network=host \
-          --config /tmp/buildkit/buildkitd.toml \
+          --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
           --use
 
         docker buildx inspect --bootstrap
 
         docker buildx build \
-          --builder ci-builder \
+          --builder $BUILDER_NAME \
           --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
           --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
           -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
@@ -371,36 +372,37 @@ EOF
             passwordVariable: 'HARBOR_PASS'
           )
         ]) {
-          sh '''
+         sh '''
         set -x
 
         IMAGE_TAG=ci-${BUILD_NUMBER}
-        SERVICE=gateway
+        SERVICE=order-service
+        BUILDER_NAME=ci-builder-${SERVICE}
 
         echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
           -u "$HARBOR_USER" --password-stdin
 
         mkdir -p /tmp/buildkit
-        cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+        cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-        docker buildx rm ci-builder || true
-        docker rm -f buildx_buildkit_ci-builder0 || true
+        docker buildx rm $BUILDER_NAME || true
+        docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
         docker buildx create \
-          --name ci-builder \
+          --name $BUILDER_NAME \
           --driver docker-container \
           --driver-opt network=host \
-          --config /tmp/buildkit/buildkitd.toml \
+          --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
           --use
 
         docker buildx inspect --bootstrap
 
         docker buildx build \
-          --builder ci-builder \
+          --builder $BUILDER_NAME \
           --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
           --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
           -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
@@ -432,32 +434,33 @@ EOF
         set -x
 
         IMAGE_TAG=ci-${BUILD_NUMBER}
-        SERVICE=user-service
+        SERVICE=order-service
+        BUILDER_NAME=ci-builder-${SERVICE}
 
         echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
           -u "$HARBOR_USER" --password-stdin
 
         mkdir -p /tmp/buildkit
-        cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+        cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-        docker buildx rm ci-builder || true
-        docker rm -f buildx_buildkit_ci-builder0 || true
+        docker buildx rm $BUILDER_NAME || true
+        docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
         docker buildx create \
-          --name ci-builder \
+          --name $BUILDER_NAME \
           --driver docker-container \
           --driver-opt network=host \
-          --config /tmp/buildkit/buildkitd.toml \
+          --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
           --use
 
         docker buildx inspect --bootstrap
 
         docker buildx build \
-          --builder ci-builder \
+          --builder $BUILDER_NAME \
           --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
           --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
           -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
@@ -490,31 +493,32 @@ EOF
 
         IMAGE_TAG=ci-${BUILD_NUMBER}
         SERVICE=order-service
+        BUILDER_NAME=ci-builder-${SERVICE}
 
         echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
           -u "$HARBOR_USER" --password-stdin
 
         mkdir -p /tmp/buildkit
-        cat > /tmp/buildkit/buildkitd.toml << 'EOF'
+        cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-        docker buildx rm ci-builder || true
-        docker rm -f buildx_buildkit_ci-builder0 || true
+        docker buildx rm $BUILDER_NAME || true
+        docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
         docker buildx create \
-          --name ci-builder \
+          --name $BUILDER_NAME \
           --driver docker-container \
           --driver-opt network=host \
-          --config /tmp/buildkit/buildkitd.toml \
+          --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
           --use
 
         docker buildx inspect --bootstrap
 
         docker buildx build \
-          --builder ci-builder \
+          --builder $BUILDER_NAME \
           --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
           --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
           -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
