@@ -3,6 +3,10 @@ pipeline {
 
   environment {
     DOCKER_REGISTRY = "rajesh00007"
+    HARBOR_PROJECT = "micro-dash"
+     ECR_REGISTRY    = "760302898980.dkr.ecr.ap-south-1.amazonaws.com"
+      HARBOR_REGISTRY = "34.180.10.118"
+
   }
 
   options {
@@ -290,166 +294,176 @@ pipeline {
         }
       }
     }
+  stage('Build and Push Images') {
+  parallel {
 
-    stage('Build and Push Images') {
-      parallel {
-
-        stage('Build Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
-
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=frontend
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder ci-builder \
-                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
-                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
-                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
-                  --push \
-                  ./frontend
-              '''
-            }
-          }
+    stage('Build Frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
         }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credentials',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-        stage('Build Gateway') {
-          when {
-            anyOf {
-              changeset "gateway/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
+            IMAGE_TAG=ci-${BUILD_NUMBER}
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=gateway
-                IMAGE_TAG=ci-${BUILD_NUMBER}
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
 
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+            docker buildx create --name ci-builder \
+              --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
 
-                docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder ci-builder \
-                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
-                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
-                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
-                  --push \
-                  ./gateway
-              '''
-            }
-          }
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/frontend:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/frontend:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/frontend:$IMAGE_TAG \
+              --push \
+              ./frontend
+          '''
         }
-
-        stage('Build User Service') {
-          when {
-            anyOf {
-              changeset "user-service/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
-
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=user-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder ci-builder \
-                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
-                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
-                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
-                  --push \
-                  ./user-service
-              '''
-            }
-          }
-        }
-
-        stage('Build Order Service') {
-          when {
-            anyOf {
-              changeset "order-service/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
-
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=order-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker buildx create --name ci-builder --driver docker-container --use || docker buildx use ci-builder
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder ci-builder \
-                  --cache-from=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache \
-                  --cache-to=type=registry,ref=$ECR_REGISTRY/$REPO_NAME:buildcache,mode=max \
-                  -t $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG \
-                  --push \
-                  ./order-service
-              '''
-            }
-          }
-        }
-
       }
     }
 
+    stage('Build Gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credentials',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            docker buildx create --name ci-builder \
+              --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/gateway:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/gateway:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/gateway:$IMAGE_TAG \
+              --push \
+              ./gateway
+          '''
+        }
+      }
+    }
+
+    stage('Build User Service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credentials',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            docker buildx create --name ci-builder \
+              --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/user-service:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/user-service:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/user-service:$IMAGE_TAG \
+              --push \
+              ./user-service
+          '''
+        }
+      }
+    }
+
+    stage('Build Order Service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credentials',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            docker buildx create --name ci-builder \
+              --driver docker-container --use || docker buildx use ci-builder
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder ci-builder \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/order-service:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/order-service:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/order-service:$IMAGE_TAG \
+              --push \
+              ./order-service
+          '''
+        }
+      }
+    }
+
+  }
+}
+    
     stage('Trivy Scan') {
       parallel {
 
