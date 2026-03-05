@@ -939,11 +939,37 @@ EOF
               passwordVariable: 'HARBOR_PASS'
             )
           ]) {
+            script {
+        // Unstash only what exists
+                sh 'mkdir -p reports'
+
+                def stashes = [
+                  'gitleaks-report',
+                  'trivy-deps-report',
+                  'sbom-frontend',
+                  'sbom-gateway',
+                  'sbom-user-service',
+                  'sbom-order-service'
+                ]
+
+                stashes.each { stashName ->
+                  try {
+                    unstash stashName
+                    echo "Unstashed: ${stashName}"
+                  } catch (Exception e) {
+                    echo "Skipping ${stashName} - not available (stage was skipped)"
+                  }
+                }
+              }
+
             sh 'mkdir -p reports'
 
             // Unstash all reports
             unstash 'gitleaks-report'
             unstash 'trivy-deps-report'
+            unstash  'coverage-user-service'
+            unstash  'coverage-order-service'
+            unstash 'coverage-gateway'
             unstash 'sbom-frontend'
             unstash 'sbom-gateway'
             unstash 'sbom-user-service'
