@@ -330,7 +330,7 @@ pipeline {
   http = true
   insecure = true
 EOF
-
+         rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
@@ -388,7 +388,7 @@ EOF
   http = true
   insecure = true
 EOF
-
+         rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
@@ -446,7 +446,7 @@ EOF
   http = true
   insecure = true
 EOF
-
+         rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
@@ -504,7 +504,7 @@ EOF
   http = true
   insecure = true
 EOF
-
+         rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
