@@ -331,6 +331,8 @@ pipeline {
   insecure = true
 EOF
          rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
@@ -389,6 +391,8 @@ EOF
   insecure = true
 EOF
          rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
@@ -447,6 +451,8 @@ EOF
   insecure = true
 EOF
          rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
@@ -505,6 +511,8 @@ EOF
   insecure = true
 EOF
          rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+         rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
         docker buildx rm $BUILDER_NAME || true
         docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
