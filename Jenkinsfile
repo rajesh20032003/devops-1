@@ -728,9 +728,13 @@ EOF
                 echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
                   -u "$HARBOR_USER" --password-stdin
 
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --from registry \
-                  -o cyclonedx-json > sbom-${SERVICE}.json
+                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
+  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+    -o cyclonedx-json \
+    > sbom-${SERVICE}.json
               '''
             }
           }
@@ -746,6 +750,7 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -765,9 +770,13 @@ EOF
                 echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
                   -u "$HARBOR_USER" --password-stdin
 
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --from registry \
-                  -o cyclonedx-json > sbom-${SERVICE}.json
+                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
+  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+    -o cyclonedx-json \
+    > sbom-${SERVICE}.json
               '''
             }
           }
@@ -783,6 +792,7 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -802,9 +812,13 @@ EOF
                 echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
                   -u "$HARBOR_USER" --password-stdin
 
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --from registry \
-                  -o cyclonedx-json > sbom-${SERVICE}.json
+                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
+  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+    -o cyclonedx-json \
+    > sbom-${SERVICE}.json
               '''
             }
           }
@@ -820,6 +834,7 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -839,9 +854,13 @@ EOF
                 echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
                   -u "$HARBOR_USER" --password-stdin
 
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --from registry \
-                  -o cyclonedx-json > sbom-${SERVICE}.json
+               SYFT_REGISTRY_INSECURE_USE_HTTP=true \
+  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+    -o cyclonedx-json \
+    > sbom-${SERVICE}.json
               '''
             }
           }
@@ -971,6 +990,7 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -1017,6 +1037,7 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -1063,6 +1084,7 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -1118,6 +1140,7 @@ EOF
             anyOf {
               changeset "frontend/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -1165,6 +1188,7 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -1212,6 +1236,7 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -1259,6 +1284,7 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
