@@ -521,189 +521,195 @@ EOF
 }
     
     stage('Trivy Scan') {
-      parallel {
+  parallel {
 
-        stage('Scan Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
-
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=frontend
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
-
-                trivy image \
-                  --scanners vuln \
-                  --download-db-only --cache-dir $HOME/.trivy \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --username AWS \
-                  --password $ECR_PASSWORD \
-                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-              '''
-            }
-          }
+    stage('Scan Frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
         }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-        stage('Scan Gateway') {
-          when {
-            anyOf {
-              changeset "gateway/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
+            SERVICE=frontend
+            IMAGE_TAG=ci-${BUILD_NUMBER}
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=gateway
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
-
-                trivy image \
-                  --scanners vuln \
-                  --download-db-only --cache-dir $HOME/.trivy \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --username AWS \
-                  --password $ECR_PASSWORD \
-                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-              '''
-            }
-          }
+            trivy image \
+              --scanners vuln \
+              --exit-code 1 \
+              --severity CRITICAL \
+              --skip-version-check \
+              --image-src remote \
+              --username $HARBOR_USER \
+              --password $HARBOR_PASS \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+          '''
         }
-
-        stage('Scan User Service') {
-          when {
-            anyOf {
-              changeset "user-service/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
-
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=user-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
-
-                trivy image \
-                  --scanners vuln \
-                  --download-db-only --cache-dir $HOME/.trivy \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --username AWS \
-                  --password $ECR_PASSWORD \
-                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-              '''
-            }
-          }
-        }
-
-        stage('Scan Order Service') {
-          when {
-            anyOf {
-              changeset "order-service/**"
-              buildingTag()
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
-
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=order-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
-
-                trivy image \
-                  --scanners vuln \
-                  --download-db-only --cache-dir $HOME/.trivy \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --username AWS \
-                  --password $ECR_PASSWORD \
-                  $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-              '''
-            }
-          }
-        }
-
       }
     }
-    stage('Generate SBOM') {
-      parallel {
 
-        stage('SBOM Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                syft $ECR_REGISTRY/frontend:ci-${BUILD_NUMBER} \
-                  -o cyclonedx-json > sbom-frontend.json
-              '''
-              archiveArtifacts artifacts: 'sbom-frontend.json'
-            }
-          }
+    stage('Scan Gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
         }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=gateway
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            trivy image \
+              --scanners vuln \
+              --exit-code 1 \
+              --severity CRITICAL \
+              --skip-version-check \
+              --image-src remote \
+              --username $HARBOR_USER \
+              --password $HARBOR_PASS \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+          '''
+        }
+      }
+    }
+
+    stage('Scan User Service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=user-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            trivy image \
+              --scanners vuln \
+              --exit-code 1 \
+              --severity CRITICAL \
+              --skip-version-check \
+              --image-src remote \
+              --username $HARBOR_USER \
+              --password $HARBOR_PASS \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+          '''
+        }
+      }
+    }
+
+    stage('Scan Order Service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=order-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            trivy image \
+              --scanners vuln \
+              --exit-code 1 \
+              --severity CRITICAL \
+              --skip-version-check \
+              --image-src remote \
+              --username $HARBOR_USER \
+              --password $HARBOR_PASS \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+          '''
+        }
+      }
+    }
+
+  }
+}
+    stage('Generate SBOM') {
+  parallel {
+
+    stage('SBOM Frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=frontend
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              -o cyclonedx-json > sbom-${SERVICE}.json
+          '''
+        }
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'sbom-frontend.json', allowEmptyArchive: true
+        }
+      }
+    }
 
     stage('SBOM Gateway') {
       when {
@@ -714,20 +720,30 @@ EOF
       }
       agent any
       steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-ecr-credentials'
-        ]]) {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
           sh '''
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            set -x
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+            SERVICE=gateway
+            IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            syft $ECR_REGISTRY/gateway:ci-${BUILD_NUMBER} \
-              -o cyclonedx-json > sbom-gateway.json
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              -o cyclonedx-json > sbom-${SERVICE}.json
           '''
-          archiveArtifacts artifacts: 'sbom-gateway.json'
+        }
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'sbom-gateway.json', allowEmptyArchive: true
         }
       }
     }
@@ -741,20 +757,30 @@ EOF
       }
       agent any
       steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-ecr-credentials'
-        ]]) {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
           sh '''
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            set -x
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+            SERVICE=user-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            syft $ECR_REGISTRY/user-service:ci-${BUILD_NUMBER} \
-              -o cyclonedx-json > sbom-user-service.json
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              -o cyclonedx-json > sbom-${SERVICE}.json
           '''
-          archiveArtifacts artifacts: 'sbom-user-service.json'
+        }
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'sbom-user-service.json', allowEmptyArchive: true
         }
       }
     }
@@ -768,20 +794,30 @@ EOF
       }
       agent any
       steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-ecr-credentials'
-        ]]) {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
           sh '''
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            set -x
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+            SERVICE=order-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            syft $ECR_REGISTRY/order-service:ci-${BUILD_NUMBER} \
-              -o cyclonedx-json > sbom-order-service.json
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              -o cyclonedx-json > sbom-${SERVICE}.json
           '''
-          archiveArtifacts artifacts: 'sbom-order-service.json'
+        }
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'sbom-order-service.json', allowEmptyArchive: true
         }
       }
     }
@@ -792,44 +828,54 @@ stage('Sign Images') {
   parallel {
 
     stage('Sign Frontend') {
-      when {
-        anyOf {
-          changeset "frontend/**"
-          buildingTag()
-          branch 'main'
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-        ]) {
-          sh '''
-            set -x
-
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-            REPO_NAME=frontend
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-            # Extract only the sha256 digest hash
-            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
-
-            COSIGN_PASSWORD=$COSIGN_PASSWORD \
-            cosign sign \
-              --key $COSIGN_KEY \
-              --yes \
-              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
-          '''
-        }
-      }
+  when {
+    anyOf {
+      changeset "frontend/**"
+      buildingTag()
+      branch 'main'
     }
+  }
+  agent any
+  steps {
+    withCredentials([
+      usernamePassword(
+        credentialsId: 'harbor-credential',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+      ),
+      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+    ]) {
+      sh '''
+        set -x
 
+        SERVICE=frontend
+        IMAGE_TAG=ci-${BUILD_NUMBER}
+
+        # Login to Harbor so docker inspect can resolve the digest
+        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+          -u "$HARBOR_USER" --password-stdin
+
+        # Pull image first so docker inspect works
+        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+
+        # Get digest
+        IMAGE_DIGEST=$(docker inspect \
+          --format='{{index .RepoDigests 0}}' \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+          | cut -d'@' -f2)
+
+        echo "Signing digest: $IMAGE_DIGEST"
+
+        COSIGN_PASSWORD=$COSIGN_PASSWORD \
+        cosign sign \
+          --key $COSIGN_KEY \
+          --yes \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+      '''
+    }
+  }
+}
     stage('Sign Gateway') {
       when {
         anyOf {
@@ -840,31 +886,42 @@ stage('Sign Images') {
       agent any
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-        ]) {
-           sh '''
-            set -x
+      usernamePassword(
+        credentialsId: 'harbor-credential',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+      ),
+      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+    ]) {
+      sh '''
+        set -x
 
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-            REPO_NAME=gateway
-            IMAGE_TAG=ci-${BUILD_NUMBER}
+        SERVICE=gateway
+        IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+        # Login to Harbor so docker inspect can resolve the digest
+        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+          -u "$HARBOR_USER" --password-stdin
 
-            # Extract only the sha256 digest hash
-            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
+        # Pull image first so docker inspect works
+        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
 
-            COSIGN_PASSWORD=$COSIGN_PASSWORD \
-            cosign sign \
-              --key $COSIGN_KEY \
-              --yes \
-              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
-          '''
-        }
+        # Get digest
+        IMAGE_DIGEST=$(docker inspect \
+          --format='{{index .RepoDigests 0}}' \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+          | cut -d'@' -f2)
+
+        echo "Signing digest: $IMAGE_DIGEST"
+
+        COSIGN_PASSWORD=$COSIGN_PASSWORD \
+        cosign sign \
+          --key $COSIGN_KEY \
+          --yes \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+      '''
+    }
       }
     }
 
@@ -878,31 +935,42 @@ stage('Sign Images') {
       agent any
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-        ]) {
-           sh '''
-            set -x
+      usernamePassword(
+        credentialsId: 'harbor-credential',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+      ),
+      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+    ]) {
+      sh '''
+        set -x
 
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-            REPO_NAME=user-service
-            IMAGE_TAG=ci-${BUILD_NUMBER}
+        SERVICE=order-service
+        IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+        # Login to Harbor so docker inspect can resolve the digest
+        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+          -u "$HARBOR_USER" --password-stdin
 
-            # Extract only the sha256 digest hash
-            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
+        # Pull image first so docker inspect works
+        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
 
-            COSIGN_PASSWORD=$COSIGN_PASSWORD \
-            cosign sign \
-              --key $COSIGN_KEY \
-              --yes \
-              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
-          '''
-        }
+        # Get digest
+        IMAGE_DIGEST=$(docker inspect \
+          --format='{{index .RepoDigests 0}}' \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+          | cut -d'@' -f2)
+
+        echo "Signing digest: $IMAGE_DIGEST"
+
+        COSIGN_PASSWORD=$COSIGN_PASSWORD \
+        cosign sign \
+          --key $COSIGN_KEY \
+          --yes \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+      '''
+    }
       }
     }
 
@@ -915,32 +983,43 @@ stage('Sign Images') {
       }
       agent any
       steps {
-        withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-        ]) {
-           sh '''
-            set -x
+         withCredentials([
+      usernamePassword(
+        credentialsId: 'harbor-credential',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS'
+      ),
+      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+    ]) {
+      sh '''
+        set -x
 
-            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-            REPO_NAME=order-service
-            IMAGE_TAG=ci-${BUILD_NUMBER}
+        SERVICE=order-service
+        IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+        # Login to Harbor so docker inspect can resolve the digest
+        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+          -u "$HARBOR_USER" --password-stdin
 
-            # Extract only the sha256 digest hash
-            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
+        # Pull image first so docker inspect works
+        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
 
-            COSIGN_PASSWORD=$COSIGN_PASSWORD \
-            cosign sign \
-              --key $COSIGN_KEY \
-              --yes \
-              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
-          '''
-        }
+        # Get digest
+        IMAGE_DIGEST=$(docker inspect \
+          --format='{{index .RepoDigests 0}}' \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+          | cut -d'@' -f2)
+
+        echo "Signing digest: $IMAGE_DIGEST"
+
+        COSIGN_PASSWORD=$COSIGN_PASSWORD \
+        cosign sign \
+          --key $COSIGN_KEY \
+          --yes \
+          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+      '''
+    }
       }
     }
 
@@ -964,25 +1043,39 @@ stage('Sign Images') {
           }
           agent any
           steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
+            withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=frontend
-                CI_TAG=ci-${BUILD_NUMBER}
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+            SERVICE=frontend
+            CI_TAG=ci-${BUILD_NUMBER}
 
-                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                echo "Promoted $CI_TAG → $IMAGE_TAG"
-              '''
-            }
+            # Login to both
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            # Pull from Harbor
+            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+
+            # Tag and push to ECR
+            docker tag \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+
+            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+            echo "Promoted $CI_TAG → $IMAGE_TAG"
+          '''
+        }
           }
         }
 
@@ -995,27 +1088,39 @@ stage('Sign Images') {
           }
           agent any
           steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
+            withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=gateway
-                CI_TAG=ci-${BUILD_NUMBER}
+            SERVICE=frontend
+            CI_TAG=ci-${BUILD_NUMBER}
 
+            # Login to both
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
 
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                echo "Promoted $CI_TAG → $IMAGE_TAG"
-              '''
-            }
+            # Pull from Harbor
+            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+
+            # Tag and push to ECR
+            docker tag \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+
+            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+            echo "Promoted $CI_TAG → $IMAGE_TAG"
+          '''
+        }
           }
         }
 
@@ -1028,27 +1133,39 @@ stage('Sign Images') {
           }
           agent any
           steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
+           withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=user-service
-                CI_TAG=ci-${BUILD_NUMBER}
+            SERVICE=frontend
+            CI_TAG=ci-${BUILD_NUMBER}
 
+            # Login to both
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
 
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                echo "Promoted $CI_TAG → $IMAGE_TAG"
-              '''
-            }
+            # Pull from Harbor
+            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+
+            # Tag and push to ECR
+            docker tag \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+
+            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+            echo "Promoted $CI_TAG → $IMAGE_TAG"
+          '''
+        }
           }
         }
 
@@ -1061,26 +1178,39 @@ stage('Sign Images') {
           }
           agent any
           steps {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              sh '''
-                set -x
+            withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-                ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
-                REPO_NAME=order-service
-                CI_TAG=ci-${BUILD_NUMBER}
+            SERVICE=frontend
+            CI_TAG=ci-${BUILD_NUMBER}
 
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
+            # Login to both
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
 
-                docker pull $ECR_REGISTRY/$REPO_NAME:$CI_TAG
-                docker tag $ECR_REGISTRY/$REPO_NAME:$CI_TAG $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                docker push $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG
-                echo "Promoted $CI_TAG → $IMAGE_TAG"
-              '''
-            }
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            # Pull from Harbor
+            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+
+            # Tag and push to ECR
+            docker tag \
+              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+
+            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+            echo "Promoted $CI_TAG → $IMAGE_TAG"
+          '''
+        }
           }
         }
 
