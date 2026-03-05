@@ -321,6 +321,8 @@ pipeline {
 
             echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
               -u "$HARBOR_USER" --password-stdin
+               docker buildx rm ci-builder || true
+
 
             docker buildx create --name ci-builder \
               --driver docker-container --use || docker buildx use ci-builder
@@ -362,6 +364,8 @@ pipeline {
 
             echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
               -u "$HARBOR_USER" --password-stdin
+               docker buildx rm ci-builder || true
+
 
             docker buildx create --name ci-builder \
               --driver docker-container --use || docker buildx use ci-builder
@@ -403,6 +407,7 @@ pipeline {
 
             echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
               -u "$HARBOR_USER" --password-stdin
+             docker buildx rm ci-builder || true
 
             docker buildx create --name ci-builder \
               --driver docker-container --use || docker buildx use ci-builder
@@ -444,6 +449,8 @@ pipeline {
 
             echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
               -u "$HARBOR_USER" --password-stdin
+               docker buildx rm ci-builder || true
+
 
             docker buildx create --name ci-builder \
               --driver docker-container --use || docker buildx use ci-builder
