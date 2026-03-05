@@ -309,7 +309,7 @@ pipeline {
       steps {
         withCredentials([
           usernamePassword(
-            credentialsId: 'harbor-credentials',
+            credentialsId: 'harbor-credential',
             usernameVariable: 'HARBOR_USER',
             passwordVariable: 'HARBOR_PASS'
           )
@@ -350,7 +350,7 @@ pipeline {
       steps {
         withCredentials([
           usernamePassword(
-            credentialsId: 'harbor-credentials',
+            credentialsId: 'harbor-credential',
             usernameVariable: 'HARBOR_USER',
             passwordVariable: 'HARBOR_PASS'
           )
@@ -391,7 +391,7 @@ pipeline {
       steps {
         withCredentials([
           usernamePassword(
-            credentialsId: 'harbor-credentials',
+            credentialsId: 'harbor-credential',
             usernameVariable: 'HARBOR_USER',
             passwordVariable: 'HARBOR_PASS'
           )
@@ -432,7 +432,7 @@ pipeline {
       steps {
         withCredentials([
           usernamePassword(
-            credentialsId: 'harbor-credentials',
+            credentialsId: 'harbor-credential',
             usernameVariable: 'HARBOR_USER',
             passwordVariable: 'HARBOR_PASS'
           )
