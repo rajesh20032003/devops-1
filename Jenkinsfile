@@ -329,230 +329,254 @@ pipeline {
     // STAGE 8: Build and Push to Harbor
     // ─────────────────────────────────────────────
     stage('Build and Push Images') {
-      parallel {
+  parallel {
 
-        stage('Build Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
+    stage('Build Frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
 
-                SERVICE=frontend
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
+            SERVICE=frontend
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+            BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
 
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
 
-                mkdir -p /tmp/buildkit
-                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+            mkdir -p /tmp/buildkit
+            cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-                docker buildx create \
-                  --name $BUILDER_NAME \
-                  --driver docker-container \
-                  --driver-opt network=host \
-                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-                  --use
+            # Clean stale metadata
+            rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
+            docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
 
-                docker buildx inspect --bootstrap
+            docker buildx create \
+              --name $BUILDER_NAME \
+              --driver docker-container \
+              --driver-opt network=host \
+              --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+              --use
 
-                docker buildx build \
-                  --builder $BUILDER_NAME \
-                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --push \
-                  ./$SERVICE
-              '''
-            }
-          }
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder $BUILDER_NAME \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              --push \
+              ./$SERVICE
+          '''
         }
-
-        stage('Build Gateway') {
-          when {
-            anyOf {
-              changeset "gateway/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-
-                SERVICE=gateway
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                mkdir -p /tmp/buildkit
-                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
-[registry."34.180.10.118"]
-  http = true
-  insecure = true
-EOF
-
-                docker buildx create \
-                  --name $BUILDER_NAME \
-                  --driver docker-container \
-                  --driver-opt network=host \
-                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-                  --use
-
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder $BUILDER_NAME \
-                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --push \
-                  ./$SERVICE
-              '''
-            }
-          }
-        }
-
-        stage('Build User Service') {
-          when {
-            anyOf {
-              changeset "user-service/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-
-                SERVICE=user-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                mkdir -p /tmp/buildkit
-                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
-[registry."34.180.10.118"]
-  http = true
-  insecure = true
-EOF
-
-                docker buildx create \
-                  --name $BUILDER_NAME \
-                  --driver docker-container \
-                  --driver-opt network=host \
-                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-                  --use
-
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder $BUILDER_NAME \
-                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --push \
-                  ./$SERVICE
-              '''
-            }
-          }
-        }
-
-        stage('Build Order Service') {
-          when {
-            anyOf {
-              changeset "order-service/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-
-                SERVICE=order-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                mkdir -p /tmp/buildkit
-                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
-[registry."34.180.10.118"]
-  http = true
-  insecure = true
-EOF
-
-                docker buildx create \
-                  --name $BUILDER_NAME \
-                  --driver docker-container \
-                  --driver-opt network=host \
-                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-                  --use
-
-                docker buildx inspect --bootstrap
-
-                docker buildx build \
-                  --builder $BUILDER_NAME \
-                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  --push \
-                  ./$SERVICE
-              '''
-            }
-          }
-        }
-
       }
     }
+
+    stage('Build Gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=gateway
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+            BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            mkdir -p /tmp/buildkit
+            cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+[registry."34.180.10.118"]
+  http = true
+  insecure = true
+EOF
+
+            # Clean stale metadata
+            rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
+            docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
+
+            docker buildx create \
+              --name $BUILDER_NAME \
+              --driver docker-container \
+              --driver-opt network=host \
+              --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+              --use
+
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder $BUILDER_NAME \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              --push \
+              ./$SERVICE
+          '''
+        }
+      }
+    }
+
+    stage('Build User Service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=user-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+            BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            mkdir -p /tmp/buildkit
+            cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+[registry."34.180.10.118"]
+  http = true
+  insecure = true
+EOF
+
+            # Clean stale metadata
+            rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
+            docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
+
+            docker buildx create \
+              --name $BUILDER_NAME \
+              --driver docker-container \
+              --driver-opt network=host \
+              --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+              --use
+
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder $BUILDER_NAME \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              --push \
+              ./$SERVICE
+          '''
+        }
+      }
+    }
+
+    stage('Build Order Service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          usernamePassword(
+            credentialsId: 'harbor-credential',
+            usernameVariable: 'HARBOR_USER',
+            passwordVariable: 'HARBOR_PASS'
+          )
+        ]) {
+          sh '''
+            set -x
+
+            SERVICE=order-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+            BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
+
+            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+              -u "$HARBOR_USER" --password-stdin
+
+            mkdir -p /tmp/buildkit
+            cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+[registry."34.180.10.118"]
+  http = true
+  insecure = true
+EOF
+
+            # Clean stale metadata
+            rm -rf $HOME/.docker/buildx/instances/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/activity/${BUILDER_NAME} || true
+            rm -rf $HOME/.docker/buildx/refs/${BUILDER_NAME} || true
+            docker rm -f buildx_buildkit_${BUILDER_NAME}0 || true
+
+            docker buildx create \
+              --name $BUILDER_NAME \
+              --driver docker-container \
+              --driver-opt network=host \
+              --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+              --use
+
+            docker buildx inspect --bootstrap
+
+            docker buildx build \
+              --builder $BUILDER_NAME \
+              --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+              --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+              -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+              --push \
+              ./$SERVICE
+          '''
+        }
+      }
+    }
+
+  }
+}
 
     // ─────────────────────────────────────────────
     // STAGE 9: Trivy Image Scan (from Harbor)
