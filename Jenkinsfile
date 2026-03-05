@@ -718,6 +718,186 @@ pipeline {
 
   }
 }
+stage('Sign Images') {
+  parallel {
+
+    stage('Sign Frontend') {
+      when {
+        anyOf {
+          changeset "frontend/**"
+          buildingTag()
+          branch 'main'
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+        ]) {
+          sh '''
+            set -x
+
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            REPO_NAME=frontend
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            # Login to ECR
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            # Get the image digest (sign by digest, not tag — more secure)
+            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG 2>/dev/null || \
+              aws ecr describe-images \
+                --repository-name $REPO_NAME \
+                --region ap-south-1 \
+                --image-ids imageTag=$IMAGE_TAG \
+                --query 'imageDetails[0].imageDigest' \
+                --output text)
+
+            # Sign the image
+            COSIGN_PASSWORD=$COSIGN_PASSWORD \
+            cosign sign \
+              --key $COSIGN_KEY \
+              --yes \
+              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
+          '''
+        }
+      }
+    }
+
+    stage('Sign Gateway') {
+      when {
+        anyOf {
+          changeset "gateway/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+        ]) {
+          sh '''
+            set -x
+
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            REPO_NAME=gateway
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            IMAGE_DIGEST=$(aws ecr describe-images \
+              --repository-name $REPO_NAME \
+              --region ap-south-1 \
+              --image-ids imageTag=$IMAGE_TAG \
+              --query 'imageDetails[0].imageDigest' \
+              --output text)
+
+            COSIGN_PASSWORD=$COSIGN_PASSWORD \
+            cosign sign \
+              --key $COSIGN_KEY \
+              --yes \
+              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
+          '''
+        }
+      }
+    }
+
+    stage('Sign User Service') {
+      when {
+        anyOf {
+          changeset "user-service/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+        ]) {
+          sh '''
+            set -x
+
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            REPO_NAME=user-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            IMAGE_DIGEST=$(aws ecr describe-images \
+              --repository-name $REPO_NAME \
+              --region ap-south-1 \
+              --image-ids imageTag=$IMAGE_TAG \
+              --query 'imageDetails[0].imageDigest' \
+              --output text)
+
+            COSIGN_PASSWORD=$COSIGN_PASSWORD \
+            cosign sign \
+              --key $COSIGN_KEY \
+              --yes \
+              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
+          '''
+        }
+      }
+    }
+
+    stage('Sign Order Service') {
+      when {
+        anyOf {
+          changeset "order-service/**"
+          buildingTag()
+        }
+      }
+      agent any
+      steps {
+        withCredentials([
+          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+          file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+          string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+        ]) {
+          sh '''
+            set -x
+
+            ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
+            REPO_NAME=order-service
+            IMAGE_TAG=ci-${BUILD_NUMBER}
+
+            aws ecr get-login-password --region ap-south-1 \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            IMAGE_DIGEST=$(aws ecr describe-images \
+              --repository-name $REPO_NAME \
+              --region ap-south-1 \
+              --image-ids imageTag=$IMAGE_TAG \
+              --query 'imageDetails[0].imageDigest' \
+              --output text)
+
+            COSIGN_PASSWORD=$COSIGN_PASSWORD \
+            cosign sign \
+              --key $COSIGN_KEY \
+              --yes \
+              $ECR_REGISTRY/$REPO_NAME@$IMAGE_DIGEST
+          '''
+        }
+      }
+    }
+
+  }
+}
+
+
+// ## Pipeline order with Cosign
+// ```
+// Build → Trivy Scan → SBOM → Sign Images → Promote
 
     stage('Promote Images') {
       parallel {
