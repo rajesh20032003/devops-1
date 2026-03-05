@@ -774,7 +774,7 @@ stage('Sign Images') {
           file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
           string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
         ]) {
-          sh '''
+           sh '''
             set -x
 
             ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
@@ -784,12 +784,9 @@ stage('Sign Images') {
             aws ecr get-login-password --region ap-south-1 \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            IMAGE_DIGEST=$(aws ecr describe-images \
-              --repository-name $REPO_NAME \
-              --region ap-south-1 \
-              --image-ids imageTag=$IMAGE_TAG \
-              --query 'imageDetails[0].imageDigest' \
-              --output text)
+            # Extract only the sha256 digest hash
+            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
 
             COSIGN_PASSWORD=$COSIGN_PASSWORD \
             cosign sign \
@@ -815,7 +812,7 @@ stage('Sign Images') {
           file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
           string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
         ]) {
-          sh '''
+           sh '''
             set -x
 
             ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
@@ -825,12 +822,9 @@ stage('Sign Images') {
             aws ecr get-login-password --region ap-south-1 \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            IMAGE_DIGEST=$(aws ecr describe-images \
-              --repository-name $REPO_NAME \
-              --region ap-south-1 \
-              --image-ids imageTag=$IMAGE_TAG \
-              --query 'imageDetails[0].imageDigest' \
-              --output text)
+            # Extract only the sha256 digest hash
+            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
 
             COSIGN_PASSWORD=$COSIGN_PASSWORD \
             cosign sign \
@@ -856,7 +850,7 @@ stage('Sign Images') {
           file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
           string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
         ]) {
-          sh '''
+           sh '''
             set -x
 
             ECR_REGISTRY=760302898980.dkr.ecr.ap-south-1.amazonaws.com
@@ -866,12 +860,9 @@ stage('Sign Images') {
             aws ecr get-login-password --region ap-south-1 \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            IMAGE_DIGEST=$(aws ecr describe-images \
-              --repository-name $REPO_NAME \
-              --region ap-south-1 \
-              --image-ids imageTag=$IMAGE_TAG \
-              --query 'imageDetails[0].imageDigest' \
-              --output text)
+            # Extract only the sha256 digest hash
+            IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
+              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
 
             COSIGN_PASSWORD=$COSIGN_PASSWORD \
             cosign sign \
