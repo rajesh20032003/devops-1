@@ -591,6 +591,7 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -627,6 +628,7 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -663,6 +665,7 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
+              branch 'main'
             }
           }
           agent any
@@ -977,7 +980,7 @@ EOF
                 COSIGN_PASSWORD=$COSIGN_PASSWORD \
                 cosign sign \
                   --key $COSIGN_KEY \
-                  --insecure-skip-verify \
+                  --allow-insecure-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
@@ -1024,7 +1027,7 @@ EOF
                 COSIGN_PASSWORD=$COSIGN_PASSWORD \
                 cosign sign \
                   --key $COSIGN_KEY \
-                  --insecure-skip-verify \
+                  --allow-insecure-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
@@ -1071,7 +1074,7 @@ EOF
                 COSIGN_PASSWORD=$COSIGN_PASSWORD \
                 cosign sign \
                   --key $COSIGN_KEY \
-                  --insecure-skip-verify \
+                  --allow-insecure-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
@@ -1118,7 +1121,7 @@ EOF
                 COSIGN_PASSWORD=$COSIGN_PASSWORD \
                 cosign sign \
                   --key $COSIGN_KEY \
-                  --insecure-skip-verify \
+                  --allow-insecure-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
