@@ -732,12 +732,12 @@ EOF
                   -u "$HARBOR_USER" --password-stdin
 
                 SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    -o cyclonedx-json \
-    > sbom-${SERVICE}.json
+                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  -o cyclonedx-json \
+                  > sbom-${SERVICE}.json
               '''
             }
           }
@@ -774,12 +774,12 @@ EOF
                   -u "$HARBOR_USER" --password-stdin
 
                 SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    -o cyclonedx-json \
-    > sbom-${SERVICE}.json
+                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  -o cyclonedx-json \
+                  > sbom-${SERVICE}.json
               '''
             }
           }
@@ -816,12 +816,12 @@ EOF
                   -u "$HARBOR_USER" --password-stdin
 
                 SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    -o cyclonedx-json \
-    > sbom-${SERVICE}.json
+                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  -o cyclonedx-json \
+                  > sbom-${SERVICE}.json
               '''
             }
           }
@@ -857,13 +857,13 @@ EOF
                 echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
                   -u "$HARBOR_USER" --password-stdin
 
-               SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-  SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-  SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-  SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-  syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    -o cyclonedx-json \
-    > sbom-${SERVICE}.json
+                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
+                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
+                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
+                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  -o cyclonedx-json \
+                  > sbom-${SERVICE}.json
               '''
             }
           }
@@ -981,6 +981,7 @@ EOF
                 cosign sign \
                   --key $COSIGN_KEY \
                   --allow-insecure-registry \
+                  --allow-http-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
@@ -1028,6 +1029,7 @@ EOF
                 cosign sign \
                   --key $COSIGN_KEY \
                   --allow-insecure-registry \
+                  --allow-http-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
@@ -1075,6 +1077,7 @@ EOF
                 cosign sign \
                   --key $COSIGN_KEY \
                   --allow-insecure-registry \
+                  --allow-http-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
@@ -1122,6 +1125,7 @@ EOF
                 cosign sign \
                   --key $COSIGN_KEY \
                   --allow-insecure-registry \
+                  --allow-http-registry \
                   --yes \
                   $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
               '''
