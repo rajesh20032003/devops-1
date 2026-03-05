@@ -2,11 +2,9 @@ pipeline {
   agent none
 
   environment {
-    DOCKER_REGISTRY = "rajesh00007"
-    HARBOR_PROJECT = "micro-dash"
-     ECR_REGISTRY    = "760302898980.dkr.ecr.ap-south-1.amazonaws.com"
-      HARBOR_REGISTRY = "34.180.10.118"
-
+    HARBOR_REGISTRY = "34.180.10.118"
+    HARBOR_PROJECT  = "micro-dash"
+    ECR_REGISTRY    = "760302898980.dkr.ecr.ap-south-1.amazonaws.com"
   }
 
   options {
@@ -18,6 +16,9 @@ pipeline {
 
   stages {
 
+    // ─────────────────────────────────────────────
+    // STAGE 1: Clean
+    // ─────────────────────────────────────────────
     stage('Clean') {
       agent any
       steps {
@@ -30,6 +31,9 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 2: Secret Scan
+    // ─────────────────────────────────────────────
     stage('Secret Scan - Gitleaks') {
       agent any
       steps {
@@ -52,6 +56,9 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 3: Dependency Scan
+    // ─────────────────────────────────────────────
     stage('Dependency Scan (Trivy Repo)') {
       when {
         anyOf {
@@ -81,12 +88,15 @@ pipeline {
           archiveArtifacts artifacts: 'trivy-deps-report.json', allowEmptyArchive: true
         }
         failure {
-          echo "CRITICAL: vulnerabilities founded in dependenicies!"
+          echo "CRITICAL: Vulnerabilities found in dependencies!"
         }
       }
     }
 
-    stage('Quality Checks-lint,unit test') {
+    // ─────────────────────────────────────────────
+    // STAGE 4: Quality Checks
+    // ─────────────────────────────────────────────
+    stage('Quality Checks - lint, unit test') {
       parallel {
 
         stage('Gateway') {
@@ -202,6 +212,9 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 5: SonarQube Analysis
+    // ─────────────────────────────────────────────
     stage('SonarQube Analysis') {
       when {
         anyOf {
@@ -250,7 +263,10 @@ pipeline {
       }
     }
 
-    stage('Quality Gate-sonarqube') {
+    // ─────────────────────────────────────────────
+    // STAGE 6: Quality Gate
+    // ─────────────────────────────────────────────
+    stage('Quality Gate - SonarQube') {
       when {
         anyOf {
           changeset "gateway/**"
@@ -270,6 +286,9 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 7: Set Image Version
+    // ─────────────────────────────────────────────
     stage('Set Image Version') {
       when {
         anyOf {
@@ -286,7 +305,7 @@ pipeline {
         script {
           if (env.TAG_NAME) {
             env.IMAGE_TAG = env.TAG_NAME
-            echo "Release build detected. Version: ${env.IMAGE_TAG}"
+            echo "Release build. Version: ${env.IMAGE_TAG}"
           } else {
             env.IMAGE_TAG = "dev-${env.BUILD_NUMBER}"
             echo "Non-release build. Using dev tag: ${env.IMAGE_TAG}"
@@ -294,391 +313,564 @@ pipeline {
         }
       }
     }
-  stage('Build and Push Images') {
-  parallel {
 
-    stage('Build Frontend') {
-      when {
-        anyOf {
-          changeset "frontend/**"
-          buildingTag()
-          branch 'main'
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-  set -x
+    // ─────────────────────────────────────────────
+    // STAGE 8: Build and Push to Harbor
+    // ─────────────────────────────────────────────
+    stage('Build and Push Images') {
+      parallel {
 
-  IMAGE_TAG=ci-${BUILD_NUMBER}
-  SERVICE=frontend
-  BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}   # ← unique per build
+        stage('Build Frontend') {
+          when {
+            anyOf {
+              changeset "frontend/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
 
-  echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-    -u "$HARBOR_USER" --password-stdin
+                SERVICE=frontend
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
 
-  mkdir -p /tmp/buildkit
-  cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                mkdir -p /tmp/buildkit
+                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-  docker buildx create \
-    --name $BUILDER_NAME \
-    --driver docker-container \
-    --driver-opt network=host \
-    --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-    --use
+                docker buildx create \
+                  --name $BUILDER_NAME \
+                  --driver docker-container \
+                  --driver-opt network=host \
+                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+                  --use
 
-  docker buildx inspect --bootstrap
+                docker buildx inspect --bootstrap
 
-  docker buildx build \
-    --builder $BUILDER_NAME \
-    --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-    --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-    -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    --push \
-    ./$SERVICE
-'''
+                docker buildx build \
+                  --builder $BUILDER_NAME \
+                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --push \
+                  ./$SERVICE
+              '''
+            }
+          }
         }
-      }
-    }
 
-    stage('Build Gateway') {
-      when {
-        anyOf {
-          changeset "gateway/**"
-          buildingTag()
-          branch 'main'
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-         sh '''
-  set -x
+        stage('Build Gateway') {
+          when {
+            anyOf {
+              changeset "gateway/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
 
-  IMAGE_TAG=ci-${BUILD_NUMBER}
-  SERVICE=gateway
-  BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}   # ← unique per build
+                SERVICE=gateway
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
 
-  echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-    -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-  mkdir -p /tmp/buildkit
-  cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+                mkdir -p /tmp/buildkit
+                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-  docker buildx create \
-    --name $BUILDER_NAME \
-    --driver docker-container \
-    --driver-opt network=host \
-    --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-    --use
+                docker buildx create \
+                  --name $BUILDER_NAME \
+                  --driver docker-container \
+                  --driver-opt network=host \
+                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+                  --use
 
-  docker buildx inspect --bootstrap
+                docker buildx inspect --bootstrap
 
-  docker buildx build \
-    --builder $BUILDER_NAME \
-    --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-    --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-    -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    --push \
-    ./$SERVICE
-'''
+                docker buildx build \
+                  --builder $BUILDER_NAME \
+                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --push \
+                  ./$SERVICE
+              '''
+            }
+          }
         }
-      }
-    }
 
-    stage('Build User Service') {
-      when {
-        anyOf {
-          changeset "user-service/**"
-          buildingTag()
-          branch 'main'
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-  set -x
+        stage('Build User Service') {
+          when {
+            anyOf {
+              changeset "user-service/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
 
-  IMAGE_TAG=ci-${BUILD_NUMBER}
-  SERVICE=user-service
-  BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}   # ← unique per build
+                SERVICE=user-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
 
-  echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-    -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-  mkdir -p /tmp/buildkit
-  cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+                mkdir -p /tmp/buildkit
+                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-  docker buildx create \
-    --name $BUILDER_NAME \
-    --driver docker-container \
-    --driver-opt network=host \
-    --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-    --use
+                docker buildx create \
+                  --name $BUILDER_NAME \
+                  --driver docker-container \
+                  --driver-opt network=host \
+                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+                  --use
 
-  docker buildx inspect --bootstrap
+                docker buildx inspect --bootstrap
 
-  docker buildx build \
-    --builder $BUILDER_NAME \
-    --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-    --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-    -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    --push \
-    ./$SERVICE
-'''
+                docker buildx build \
+                  --builder $BUILDER_NAME \
+                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --push \
+                  ./$SERVICE
+              '''
+            }
+          }
         }
-      }
-    }
 
-    stage('Build Order Service') {
-      when {
-        anyOf {
-          changeset "order-service/**"
-          buildingTag()
-          branch 'main'
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-         sh '''
-  set -x
+        stage('Build Order Service') {
+          when {
+            anyOf {
+              changeset "order-service/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
 
-  IMAGE_TAG=ci-${BUILD_NUMBER}
-  SERVICE=order-service
-  BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}   # ← unique per build
+                SERVICE=order-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+                BUILDER_NAME=ci-builder-${SERVICE}-${BUILD_NUMBER}
 
-  echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-    -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-  mkdir -p /tmp/buildkit
-  cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
+                mkdir -p /tmp/buildkit
+                cat > /tmp/buildkit/buildkitd-${SERVICE}.toml << 'EOF'
 [registry."34.180.10.118"]
   http = true
   insecure = true
 EOF
 
-  docker buildx create \
-    --name $BUILDER_NAME \
-    --driver docker-container \
-    --driver-opt network=host \
-    --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
-    --use
+                docker buildx create \
+                  --name $BUILDER_NAME \
+                  --driver docker-container \
+                  --driver-opt network=host \
+                  --config /tmp/buildkit/buildkitd-${SERVICE}.toml \
+                  --use
 
-  docker buildx inspect --bootstrap
+                docker buildx inspect --bootstrap
 
-  docker buildx build \
-    --builder $BUILDER_NAME \
-    --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
-    --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
-    -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-    --push \
-    ./$SERVICE
-'''
+                docker buildx build \
+                  --builder $BUILDER_NAME \
+                  --cache-from=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache \
+                  --cache-to=type=registry,ref=$HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:buildcache,mode=max \
+                  -t $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --push \
+                  ./$SERVICE
+              '''
+            }
+          }
         }
+
       }
     }
 
-  }
-}
-    
+    // ─────────────────────────────────────────────
+    // STAGE 9: Trivy Image Scan (from Harbor)
+    // ─────────────────────────────────────────────
     stage('Trivy Scan') {
-  parallel {
+      parallel {
 
-    stage('Scan Frontend') {
-      when {
-        anyOf {
-          changeset "frontend/**"
-          buildingTag()
-          branch 'main'
+        stage('Scan Frontend') {
+          when {
+            anyOf {
+              changeset "frontend/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=frontend
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --insecure \
+                  --username $HARBOR_USER \
+                  --password $HARBOR_PASS \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+              '''
+            }
+          }
         }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
 
-            SERVICE=frontend
-            IMAGE_TAG=ci-${BUILD_NUMBER}
+        stage('Scan Gateway') {
+          when {
+            anyOf {
+              changeset "gateway/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=gateway
+                IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            trivy image \
-              --scanners vuln \
-              --exit-code 1 \
-              --severity CRITICAL \
-              --skip-version-check \
-              --image-src remote \
-              --username $HARBOR_USER \
-              --password $HARBOR_PASS \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-          '''
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --insecure \
+                  --username $HARBOR_USER \
+                  --password $HARBOR_PASS \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+              '''
+            }
+          }
         }
+
+        stage('Scan User Service') {
+          when {
+            anyOf {
+              changeset "user-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=user-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --insecure \
+                  --username $HARBOR_USER \
+                  --password $HARBOR_PASS \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+              '''
+            }
+          }
+        }
+
+        stage('Scan Order Service') {
+          when {
+            anyOf {
+              changeset "order-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=order-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                trivy image \
+                  --scanners vuln \
+                  --exit-code 1 \
+                  --severity CRITICAL \
+                  --skip-version-check \
+                  --image-src remote \
+                  --insecure \
+                  --username $HARBOR_USER \
+                  --password $HARBOR_PASS \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+              '''
+            }
+          }
+        }
+
       }
     }
 
-    stage('Scan Gateway') {
-      when {
-        anyOf {
-          changeset "gateway/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-
-            SERVICE=gateway
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            trivy image \
-              --scanners vuln \
-              --exit-code 1 \
-              --severity CRITICAL \
-              --skip-version-check \
-              --image-src remote \
-              --username $HARBOR_USER \
-              --password $HARBOR_PASS \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-          '''
-        }
-      }
-    }
-
-    stage('Scan User Service') {
-      when {
-        anyOf {
-          changeset "user-service/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-
-            SERVICE=user-service
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            trivy image \
-              --scanners vuln \
-              --exit-code 1 \
-              --severity CRITICAL \
-              --skip-version-check \
-              --image-src remote \
-              --username $HARBOR_USER \
-              --password $HARBOR_PASS \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-          '''
-        }
-      }
-    }
-
-    stage('Scan Order Service') {
-      when {
-        anyOf {
-          changeset "order-service/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-
-            SERVICE=order-service
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            trivy image \
-              --scanners vuln \
-              --exit-code 1 \
-              --severity CRITICAL \
-              --skip-version-check \
-              --image-src remote \
-              --username $HARBOR_USER \
-              --password $HARBOR_PASS \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-          '''
-        }
-      }
-    }
-
-  }
-}
+    // ─────────────────────────────────────────────
+    // STAGE 10: Generate SBOM and push to Harbor
+    // ─────────────────────────────────────────────
     stage('Generate SBOM') {
-  parallel {
+      parallel {
 
-    stage('SBOM Frontend') {
+        stage('SBOM Frontend') {
+          when {
+            anyOf {
+              changeset "frontend/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=frontend
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --from registry \
+                  --insecure-skip-tls-verify \
+                  -o cyclonedx-json > sbom-${SERVICE}.json
+              '''
+            }
+          }
+          post {
+            always {
+              archiveArtifacts artifacts: 'sbom-frontend.json', allowEmptyArchive: true
+            }
+          }
+        }
+
+        stage('SBOM Gateway') {
+          when {
+            anyOf {
+              changeset "gateway/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=gateway
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --from registry \
+                  --insecure-skip-tls-verify \
+                  -o cyclonedx-json > sbom-${SERVICE}.json
+              '''
+            }
+          }
+          post {
+            always {
+              archiveArtifacts artifacts: 'sbom-gateway.json', allowEmptyArchive: true
+            }
+          }
+        }
+
+        stage('SBOM User Service') {
+          when {
+            anyOf {
+              changeset "user-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=user-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --from registry \
+                  --insecure-skip-tls-verify \
+                  -o cyclonedx-json > sbom-${SERVICE}.json
+              '''
+            }
+          }
+          post {
+            always {
+              archiveArtifacts artifacts: 'sbom-user-service.json', allowEmptyArchive: true
+            }
+          }
+        }
+
+        stage('SBOM Order Service') {
+          when {
+            anyOf {
+              changeset "order-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=order-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  --from registry \
+                  --insecure-skip-tls-verify \
+                  -o cyclonedx-json > sbom-${SERVICE}.json
+              '''
+            }
+          }
+          post {
+            always {
+              archiveArtifacts artifacts: 'sbom-order-service.json', allowEmptyArchive: true
+            }
+          }
+        }
+
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 11: Upload Reports to Harbor
+    // (gitleaks, trivy-deps, trivy-image, sbom)
+    // ─────────────────────────────────────────────
+    stage('Upload Reports to Harbor') {
       when {
         anyOf {
+          changeset "gateway/**"
+          changeset "order-service/**"
+          changeset "user-service/**"
           changeset "frontend/**"
           buildingTag()
-          branch 'main'
         }
       }
       agent any
@@ -692,345 +884,236 @@ EOF
         ]) {
           sh '''
             set -x
-
-            SERVICE=frontend
-            IMAGE_TAG=ci-${BUILD_NUMBER}
+            BUILD_TAG=build-${BUILD_NUMBER}
 
             echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
               -u "$HARBOR_USER" --password-stdin
 
-            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-              -o cyclonedx-json > sbom-${SERVICE}.json
+            # Upload each report as OCI artifact using oras
+            # gitleaks report
+            if [ -f gitleaks-report.json ]; then
+              oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:gitleaks-${BUILD_NUMBER} \
+                --insecure \
+                gitleaks-report.json:application/json
+            fi
+
+            # trivy dependency report
+            if [ -f trivy-deps-report.json ]; then
+              oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:trivy-deps-${BUILD_NUMBER} \
+                --insecure \
+                trivy-deps-report.json:application/json
+            fi
+
+            # sbom reports
+            for SERVICE in frontend gateway user-service order-service; do
+              if [ -f sbom-${SERVICE}.json ]; then
+                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:sbom-${SERVICE}-${BUILD_NUMBER} \
+                  --insecure \
+                  sbom-${SERVICE}.json:application/json
+              fi
+            done
           '''
         }
       }
-      post {
-        always {
-          archiveArtifacts artifacts: 'sbom-frontend.json', allowEmptyArchive: true
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 12: Sign Images in Harbor
+    // ─────────────────────────────────────────────
+    stage('Sign Images') {
+      parallel {
+
+        stage('Sign Frontend') {
+          when {
+            anyOf {
+              changeset "frontend/**"
+              buildingTag()
+              branch 'main'
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              ),
+              file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+              string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+            ]) {
+              sh '''
+                set -x
+                SERVICE=frontend
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+
+                IMAGE_DIGEST=$(docker inspect \
+                  --format='{{index .RepoDigests 0}}' \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  | cut -d'@' -f2)
+
+                echo "Signing digest: $IMAGE_DIGEST"
+
+                COSIGN_PASSWORD=$COSIGN_PASSWORD \
+                cosign sign \
+                  --key $COSIGN_KEY \
+                  --insecure-skip-verify \
+                  --yes \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+              '''
+            }
+          }
         }
+
+        stage('Sign Gateway') {
+          when {
+            anyOf {
+              changeset "gateway/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              ),
+              file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+              string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+            ]) {
+              sh '''
+                set -x
+                SERVICE=gateway
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+
+                IMAGE_DIGEST=$(docker inspect \
+                  --format='{{index .RepoDigests 0}}' \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  | cut -d'@' -f2)
+
+                echo "Signing digest: $IMAGE_DIGEST"
+
+                COSIGN_PASSWORD=$COSIGN_PASSWORD \
+                cosign sign \
+                  --key $COSIGN_KEY \
+                  --insecure-skip-verify \
+                  --yes \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+              '''
+            }
+          }
+        }
+
+        stage('Sign User Service') {
+          when {
+            anyOf {
+              changeset "user-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              ),
+              file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+              string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+            ]) {
+              sh '''
+                set -x
+                SERVICE=user-service          # ← fixed (was order-service before)
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+
+                IMAGE_DIGEST=$(docker inspect \
+                  --format='{{index .RepoDigests 0}}' \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  | cut -d'@' -f2)
+
+                echo "Signing digest: $IMAGE_DIGEST"
+
+                COSIGN_PASSWORD=$COSIGN_PASSWORD \
+                cosign sign \
+                  --key $COSIGN_KEY \
+                  --insecure-skip-verify \
+                  --yes \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+              '''
+            }
+          }
+        }
+
+        stage('Sign Order Service') {
+          when {
+            anyOf {
+              changeset "order-service/**"
+              buildingTag()
+            }
+          }
+          agent any
+          steps {
+            withCredentials([
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              ),
+              file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
+              string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
+            ]) {
+              sh '''
+                set -x
+                SERVICE=order-service
+                IMAGE_TAG=ci-${BUILD_NUMBER}
+
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
+
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
+
+                IMAGE_DIGEST=$(docker inspect \
+                  --format='{{index .RepoDigests 0}}' \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
+                  | cut -d'@' -f2)
+
+                echo "Signing digest: $IMAGE_DIGEST"
+
+                COSIGN_PASSWORD=$COSIGN_PASSWORD \
+                cosign sign \
+                  --key $COSIGN_KEY \
+                  --insecure-skip-verify \
+                  --yes \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
+              '''
+            }
+          }
+        }
+
       }
     }
 
-    stage('SBOM Gateway') {
-      when {
-        anyOf {
-          changeset "gateway/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-
-            SERVICE=gateway
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
-
-            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-              -o cyclonedx-json > sbom-${SERVICE}.json
-          '''
-        }
-      }
-      post {
-        always {
-          archiveArtifacts artifacts: 'sbom-gateway.json', allowEmptyArchive: true
-        }
-      }
-    }
-
-    stage('SBOM User Service') {
-      when {
-        anyOf {
-          changeset "user-service/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-
-            SERVICE=user-service
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
-
-            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-              -o cyclonedx-json > sbom-${SERVICE}.json
-          '''
-        }
-      }
-      post {
-        always {
-          archiveArtifacts artifacts: 'sbom-user-service.json', allowEmptyArchive: true
-        }
-      }
-    }
-
-    stage('SBOM Order Service') {
-      when {
-        anyOf {
-          changeset "order-service/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
-
-            SERVICE=order-service
-            IMAGE_TAG=ci-${BUILD_NUMBER}
-
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
-
-            syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-              -o cyclonedx-json > sbom-${SERVICE}.json
-          '''
-        }
-      }
-      post {
-        always {
-          archiveArtifacts artifacts: 'sbom-order-service.json', allowEmptyArchive: true
-        }
-      }
-    }
-
-  }
-}
-stage('Sign Images') {
-  parallel {
-
-    stage('Sign Frontend') {
-  when {
-    anyOf {
-      changeset "frontend/**"
-      buildingTag()
-      branch 'main'
-    }
-  }
-  agent any
-  steps {
-    withCredentials([
-      usernamePassword(
-        credentialsId: 'harbor-credential',
-        usernameVariable: 'HARBOR_USER',
-        passwordVariable: 'HARBOR_PASS'
-      ),
-      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-    ]) {
-      sh '''
-        set -x
-
-        SERVICE=frontend
-        IMAGE_TAG=ci-${BUILD_NUMBER}
-
-        # Login to Harbor so docker inspect can resolve the digest
-        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-          -u "$HARBOR_USER" --password-stdin
-
-        # Pull image first so docker inspect works
-        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-
-        # Get digest
-        IMAGE_DIGEST=$(docker inspect \
-          --format='{{index .RepoDigests 0}}' \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-          | cut -d'@' -f2)
-
-        echo "Signing digest: $IMAGE_DIGEST"
-
-        COSIGN_PASSWORD=$COSIGN_PASSWORD \
-        cosign sign \
-          --key $COSIGN_KEY \
-          --yes \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
-      '''
-    }
-  }
-}
-    stage('Sign Gateway') {
-      when {
-        anyOf {
-          changeset "gateway/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-      usernamePassword(
-        credentialsId: 'harbor-credential',
-        usernameVariable: 'HARBOR_USER',
-        passwordVariable: 'HARBOR_PASS'
-      ),
-      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-    ]) {
-      sh '''
-        set -x
-
-        SERVICE=gateway
-        IMAGE_TAG=ci-${BUILD_NUMBER}
-
-        # Login to Harbor so docker inspect can resolve the digest
-        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-          -u "$HARBOR_USER" --password-stdin
-
-        # Pull image first so docker inspect works
-        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-
-        # Get digest
-        IMAGE_DIGEST=$(docker inspect \
-          --format='{{index .RepoDigests 0}}' \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-          | cut -d'@' -f2)
-
-        echo "Signing digest: $IMAGE_DIGEST"
-
-        COSIGN_PASSWORD=$COSIGN_PASSWORD \
-        cosign sign \
-          --key $COSIGN_KEY \
-          --yes \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
-      '''
-    }
-      }
-    }
-
-    stage('Sign User Service') {
-      when {
-        anyOf {
-          changeset "user-service/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-        withCredentials([
-      usernamePassword(
-        credentialsId: 'harbor-credential',
-        usernameVariable: 'HARBOR_USER',
-        passwordVariable: 'HARBOR_PASS'
-      ),
-      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-    ]) {
-      sh '''
-        set -x
-
-        SERVICE=order-service
-        IMAGE_TAG=ci-${BUILD_NUMBER}
-
-        # Login to Harbor so docker inspect can resolve the digest
-        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-          -u "$HARBOR_USER" --password-stdin
-
-        # Pull image first so docker inspect works
-        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-
-        # Get digest
-        IMAGE_DIGEST=$(docker inspect \
-          --format='{{index .RepoDigests 0}}' \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-          | cut -d'@' -f2)
-
-        echo "Signing digest: $IMAGE_DIGEST"
-
-        COSIGN_PASSWORD=$COSIGN_PASSWORD \
-        cosign sign \
-          --key $COSIGN_KEY \
-          --yes \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
-      '''
-    }
-      }
-    }
-
-    stage('Sign Order Service') {
-      when {
-        anyOf {
-          changeset "order-service/**"
-          buildingTag()
-        }
-      }
-      agent any
-      steps {
-         withCredentials([
-      usernamePassword(
-        credentialsId: 'harbor-credential',
-        usernameVariable: 'HARBOR_USER',
-        passwordVariable: 'HARBOR_PASS'
-      ),
-      file(credentialsId: 'cosign-private-key', variable: 'COSIGN_KEY'),
-      string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')
-    ]) {
-      sh '''
-        set -x
-
-        SERVICE=order-service
-        IMAGE_TAG=ci-${BUILD_NUMBER}
-
-        # Login to Harbor so docker inspect can resolve the digest
-        echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-          -u "$HARBOR_USER" --password-stdin
-
-        # Pull image first so docker inspect works
-        docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-
-        # Get digest
-        IMAGE_DIGEST=$(docker inspect \
-          --format='{{index .RepoDigests 0}}' \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-          | cut -d'@' -f2)
-
-        echo "Signing digest: $IMAGE_DIGEST"
-
-        COSIGN_PASSWORD=$COSIGN_PASSWORD \
-        cosign sign \
-          --key $COSIGN_KEY \
-          --yes \
-          $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE@$IMAGE_DIGEST
-      '''
-    }
-      }
-    }
-
-  }
-}
-
-
-// ## Pipeline order with Cosign
-// ```
-// Build → Trivy Scan → SBOM → Sign Images → Promote
-
+    // ─────────────────────────────────────────────
+    // STAGE 13: Promote Harbor → ECR (production)
+    // ─────────────────────────────────────────────
     stage('Promote Images') {
       parallel {
 
@@ -1044,38 +1127,40 @@ stage('Sign Images') {
           agent any
           steps {
             withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
+              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=frontend
+                CI_TAG=ci-${BUILD_NUMBER}
 
-            SERVICE=frontend
-            CI_TAG=ci-${BUILD_NUMBER}
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
 
-            # Login to both
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Pull from Harbor
-            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
 
-            # Tag and push to ECR
-            docker tag \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+                docker tag \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
 
-            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
-            echo "Promoted $CI_TAG → $IMAGE_TAG"
-          '''
-        }
+                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
+              '''
+            }
           }
         }
 
@@ -1089,38 +1174,40 @@ stage('Sign Images') {
           agent any
           steps {
             withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
+              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=gateway           # ← fixed (was frontend before)
+                CI_TAG=ci-${BUILD_NUMBER}
 
-            SERVICE=frontend
-            CI_TAG=ci-${BUILD_NUMBER}
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
 
-            # Login to both
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Pull from Harbor
-            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
 
-            # Tag and push to ECR
-            docker tag \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+                docker tag \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
 
-            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
-            echo "Promoted $CI_TAG → $IMAGE_TAG"
-          '''
-        }
+                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
+              '''
+            }
           }
         }
 
@@ -1133,39 +1220,41 @@ stage('Sign Images') {
           }
           agent any
           steps {
-           withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
+            withCredentials([
+              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=user-service      # ← fixed (was frontend before)
+                CI_TAG=ci-${BUILD_NUMBER}
 
-            SERVICE=frontend
-            CI_TAG=ci-${BUILD_NUMBER}
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
 
-            # Login to both
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Pull from Harbor
-            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
 
-            # Tag and push to ECR
-            docker tag \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+                docker tag \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
 
-            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
-            echo "Promoted $CI_TAG → $IMAGE_TAG"
-          '''
-        }
+                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
+              '''
+            }
           }
         }
 
@@ -1179,49 +1268,57 @@ stage('Sign Images') {
           agent any
           steps {
             withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          sh '''
-            set -x
+              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
+              usernamePassword(
+                credentialsId: 'harbor-credential',
+                usernameVariable: 'HARBOR_USER',
+                passwordVariable: 'HARBOR_PASS'
+              )
+            ]) {
+              sh '''
+                set -x
+                SERVICE=order-service     # ← fixed (was frontend before)
+                CI_TAG=ci-${BUILD_NUMBER}
 
-            SERVICE=frontend
-            CI_TAG=ci-${BUILD_NUMBER}
+                if [ -n "$TAG_NAME" ]; then
+                  FINAL_TAG=$TAG_NAME
+                else
+                  FINAL_TAG=dev-${BUILD_NUMBER}
+                fi
 
-            # Login to both
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
+                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                  -u "$HARBOR_USER" --password-stdin
 
-            aws ecr get-login-password --region ap-south-1 \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+                aws ecr get-login-password --region ap-south-1 \
+                  | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Pull from Harbor
-            docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
+                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
 
-            # Tag and push to ECR
-            docker tag \
-              $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-              $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
+                docker tag \
+                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
+                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
 
-            docker push $ECR_REGISTRY/$SERVICE:$IMAGE_TAG
-            echo "Promoted $CI_TAG → $IMAGE_TAG"
-          '''
-        }
+                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
+                echo "Promoted $CI_TAG → $FINAL_TAG"
+              '''
+            }
           }
         }
 
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 14: Cleanup
+    // ─────────────────────────────────────────────
     stage('Cleanup') {
       agent any
       steps {
         cleanWs()
-        sh 'docker image prune -f || true'
+        sh '''
+          docker image prune -f || true
+          docker buildx prune -f || true
+        '''
       }
     }
 
@@ -1230,14 +1327,14 @@ stage('Sign Images') {
   post {
     success {
       emailext(
-        subject: "SUCCESS!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body: "Build succeeded!\nURL: ${env.BUILD_URL}",
         to: "rajeshgovindan777@gmail.com"
       )
     }
     failure {
       emailext(
-        subject: "FAILED!: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body: "Build FAILED!\nURL: ${env.BUILD_URL}\nConsole: ${env.BUILD_URL}console",
         to: "rajeshgovindan777@gmail.com",
         attachLog: true,
@@ -1245,4 +1342,5 @@ stage('Sign Images') {
       )
     }
   }
+
 }
