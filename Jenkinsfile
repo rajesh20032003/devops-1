@@ -743,21 +743,13 @@ stage('Sign Images') {
             REPO_NAME=frontend
             IMAGE_TAG=ci-${BUILD_NUMBER}
 
-            # Login to ECR
             aws ecr get-login-password --region ap-south-1 \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Get the image digest (sign by digest, not tag — more secure)
+            # Extract only the sha256 digest hash
             IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' \
-              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG 2>/dev/null || \
-              aws ecr describe-images \
-                --repository-name $REPO_NAME \
-                --region ap-south-1 \
-                --image-ids imageTag=$IMAGE_TAG \
-                --query 'imageDetails[0].imageDigest' \
-                --output text)
+              $ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG | cut -d'@' -f2)
 
-            # Sign the image
             COSIGN_PASSWORD=$COSIGN_PASSWORD \
             cosign sign \
               --key $COSIGN_KEY \
