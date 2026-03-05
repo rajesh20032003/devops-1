@@ -730,7 +730,6 @@ EOF
 
                 syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
                   --from registry \
-                  --insecure-skip-tls-verify \
                   -o cyclonedx-json > sbom-${SERVICE}.json
               '''
             }
@@ -768,7 +767,6 @@ EOF
 
                 syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
                   --from registry \
-                  --insecure-skip-tls-verify \
                   -o cyclonedx-json > sbom-${SERVICE}.json
               '''
             }
@@ -806,7 +804,6 @@ EOF
 
                 syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
                   --from registry \
-                  --insecure-skip-tls-verify \
                   -o cyclonedx-json > sbom-${SERVICE}.json
               '''
             }
@@ -844,7 +841,6 @@ EOF
 
                 syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
                   --from registry \
-                  --insecure-skip-tls-verify \
                   -o cyclonedx-json > sbom-${SERVICE}.json
               '''
             }
