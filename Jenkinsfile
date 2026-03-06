@@ -603,7 +603,7 @@ pipeline {
             anyOf {
               changeset "frontend/**"
               buildingTag()
-              //branch 'main'
+              branch 'main'
             }
           }
           agent any
@@ -651,7 +651,7 @@ pipeline {
             anyOf {
               changeset "gateway/**"
               buildingTag()
-              //branch 'main'
+              branch 'main'
             }
           }
           agent any
@@ -699,7 +699,7 @@ pipeline {
             anyOf {
               changeset "user-service/**"
               buildingTag()
-              //branch 'main'
+              branch 'main'
             }
           }
           agent any
@@ -747,7 +747,7 @@ pipeline {
             anyOf {
               changeset "order-service/**"
               buildingTag()
-              //branch 'main'
+              branch 'main'
             }
           }
           agent any
@@ -800,13 +800,13 @@ pipeline {
       parallel {
 
         stage('Promote Frontend') {
-          when { anyOf { changeset 'frontend/**'; buildingTag() } }
+          when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
           steps { promoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote Gateway') {
-          when { anyOf { changeset 'gateway/**'; buildingTag() } }
+          when { anyOf { changeset 'gateway/**'; buildingTag()  } }
           agent any
           steps { promoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
