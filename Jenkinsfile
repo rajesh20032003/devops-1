@@ -88,20 +88,21 @@ pipeline {
         stage('Gateway') {
           when  { beforeAgent true; anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
-          steps { Nodequalitycheck('gateway') }
+          steps {measureStage("Build Gateway") { Nodequalitycheck('gateway')} }
         }
 
         stage('User Service') {
           when  { beforeAgent true; anyOf { changeset "**/user-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
-          steps { Nodequalitycheck('user-service') }
+          steps {measureStage("Build Gateway") { Nodequalitycheck('user-service')} }
         }
 
         stage('Order Service') {
           when  { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
           steps {
-            Nodequalitycheck('order-service') {
+            measureStage("Build Gateway") {
+            Nodequalitycheck('order-service')} {
               sh 'npx jest --clearCache'   // runs before npm test inside the shared lib
             }
           }
@@ -112,10 +113,12 @@ pipeline {
           when  {beforeAgent true; anyOf {  changeset "**/frontend/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
+            measureStage("Build Gateway") {
             dir('frontend') {
               sh 'rm -rf node_modules'
               sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
               sh 'npm run lint:html || true'
+            }
             }
           }
         }
