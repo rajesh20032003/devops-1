@@ -98,7 +98,7 @@ pipeline {
         }
 
         stage('Order Service') {
-          when  { anyOf { beforeAgent true; changeset "**/order-service/**"; buildingTag() } }
+          when  { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
           steps {
             Nodequalitycheck('order-service') {
@@ -109,7 +109,7 @@ pipeline {
 
         // ── Frontend is different: no unit tests, only HTML lint ─────────────
         stage('Frontend') {
-          when  { anyOf { beforeAgent true; changeset "**/frontend/**"; branch 'main'; buildingTag() } }
+          when  {beforeAgent true; anyOf {  changeset "**/frontend/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
             dir('frontend') {
