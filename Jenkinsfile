@@ -86,7 +86,7 @@ pipeline {
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
           steps {
             measureStage('Quality_Check_Gateway') {
-              NodeQualityCheck('gateway')
+              NodeQualitycheck('gateway')
             }
           }
         }
@@ -96,7 +96,7 @@ pipeline {
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
           steps {
             measureStage('Quality_Check_User_Service') {
-              NodeQualityCheck('user-service')
+              NodeQualitycheck('user-service')
             }
           }
         }
@@ -107,7 +107,7 @@ pipeline {
           steps {
             measureStage('Quality_Check_Order_Service') {
               // FIX: extra steps closure passed as second arg INTO nodeQualityCheck
-              NodeQualityCheck('order-service') {
+              NodeQualitycheck('order-service') {
                 sh 'npx jest --clearCache'
               }
             }
