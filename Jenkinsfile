@@ -78,72 +78,38 @@ pipeline {
       }
     }
 
-    stage('Quality Checks - lint, unit test') {
+     stage('Quality Checks - lint, unit test') {
       parallel {
 
+        // ── Backend services via shared lib ──────────────────────────────────
+        // nodeQualityCheck(service) runs: npm ci → lint → test → coverage stash
+        // order-service needs an extra jest cache clear before tests
+
         stage('Gateway') {
-          when { anyOf { changeset "**/gateway/**"; buildingTag() } }
+          when  { anyOf { changeset "**/gateway/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
-          steps {
-            dir('gateway') {
-              sh 'rm -rf node_modules'
-              sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint -- --fix'
-              sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
-            }
-          }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: 'gateway/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'gateway/coverage/lcov.info']]
-              stash name: 'coverage-gateway', includes: 'gateway/coverage/**', allowEmpty: true
-            }
-          }
+          steps { Nodequalitycheck('gateway') }
         }
 
         stage('User Service') {
-          when { anyOf { changeset "**/user-service/**"; buildingTag() } }
+          when  { anyOf { changeset "**/user-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
-          steps {
-            dir('user-service') {
-              sh 'rm -rf node_modules'
-              sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint -- --fix'
-              sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
-            }
-          }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: 'user-service/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'user-service/coverage/lcov.info']]
-              stash name: 'coverage-user-service', includes: 'user-service/coverage/**', allowEmpty: true
-            }
-          }
+          steps { Nodequalitycheck('user-service') }
         }
 
         stage('Order Service') {
-          when { anyOf { changeset "**/order-service/**"; buildingTag() } }
+          when  { anyOf { changeset "**/order-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
           steps {
-            dir('order-service') {
-              sh 'rm -rf node_modules'
-              sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint -- --fix'
-              sh 'npx jest --clearCache'
-              sh 'npm test -- --coverage --coverageReporters=lcov --ci --reporters=default --reporters=jest-junit'
-            }
-          }
-          post {
-            always {
-              junit allowEmptyResults: true, testResults: 'order-service/coverage/junit.xml'
-              recordCoverage tools: [[parser: 'LCOV', pattern: 'order-service/coverage/lcov.info']]
-              stash name: 'coverage-order-service', includes: 'order-service/coverage/**', allowEmpty: true
+            Nodequalitycheck('order-service') {
+              sh 'npx jest --clearCache'   // runs before npm test inside the shared lib
             }
           }
         }
 
+        // ── Frontend is different: no unit tests, only HTML lint ─────────────
         stage('Frontend') {
-          when { anyOf { changeset "**/frontend/**"; buildingTag() } }
+          when  { anyOf { changeset "**/frontend/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
             dir('frontend') {
