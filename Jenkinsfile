@@ -78,47 +78,52 @@ pipeline {
       }
     }
 
-     stage('Quality Checks - lint, unit test') {
+      stage('Quality Checks - lint, unit test') {
       parallel {
-
-        // ── Backend services via shared lib ──────────────────────────────────
-        // nodeQualityCheck(service) runs: npm ci → lint → test → coverage stash
-        // order-service needs an extra jest cache clear before tests
 
         stage('Gateway') {
           when  { beforeAgent true; anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
-          steps {measureStage("Build Gateway") { Nodequalitycheck('gateway')} }
+          steps {
+            measureStage('Quality_Check_Gateway') {
+              NodeQualityCheck('gateway')
+            }
+          }
         }
 
         stage('User Service') {
           when  { beforeAgent true; anyOf { changeset "**/user-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
-          steps {measureStage("Build Gateway") { Nodequalitycheck('user-service')} }
+          steps {
+            measureStage('Quality_Check_User_Service') {
+              NodeQualityCheck('user-service')
+            }
+          }
         }
 
         stage('Order Service') {
           when  { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
           steps {
-            measureStage("Build Gateway") {
-            Nodequalitycheck('order-service')} {
-              sh 'npx jest --clearCache'   // runs before npm test inside the shared lib
+            measureStage('Quality_Check_Order_Service') {
+              // FIX: extra steps closure passed as second arg INTO nodeQualityCheck
+              NodeQualityCheck('order-service') {
+                sh 'npx jest --clearCache'
+              }
             }
           }
         }
 
-        // ── Frontend is different: no unit tests, only HTML lint ─────────────
         stage('Frontend') {
-          when  {beforeAgent true; anyOf {  changeset "**/frontend/**"; branch 'main'; buildingTag() } }
+          when  { beforeAgent true; anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
-            measureStage("Build Gateway") {
-            dir('frontend') {
-              sh 'rm -rf node_modules'
-              sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-              sh 'npm run lint:html || true'
-            }
+            measureStage('Quality_Check_Frontend') {
+              dir('frontend') {
+                sh 'rm -rf node_modules'
+                sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
+                sh 'npm run lint:html || true'
+              }
             }
           }
         }
