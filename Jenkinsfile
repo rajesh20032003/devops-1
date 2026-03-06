@@ -85,9 +85,7 @@ pipeline {
           when  { beforeAgent true; anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
           steps {
-            measureStage('Quality_Check_Gateway') {
               NodeQualitycheck('gateway')
-            }
           }
         }
 
@@ -95,9 +93,9 @@ pipeline {
           when  { beforeAgent true; anyOf { changeset "**/user-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
           steps {
-            measureStage('Quality_Check_User_Service') {
+           
               NodeQualitycheck('user-service')
-            }
+            
           }
         }
 
@@ -105,12 +103,9 @@ pipeline {
           when  { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
           steps {
-            measureStage('Quality_Check_Order_Service') {
-              // FIX: extra steps closure passed as second arg INTO nodeQualityCheck
               NodeQualitycheck('order-service') {
                 sh 'npx jest --clearCache'
               }
-            }
           }
         }
 
