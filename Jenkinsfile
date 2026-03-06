@@ -113,13 +113,12 @@ pipeline {
           when  { beforeAgent true; anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
-            measureStage('Quality_Check_Frontend') {
+            
               dir('frontend') {
                 sh 'rm -rf node_modules'
                 sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
                 sh 'npm run lint:html || true'
               }
-            }
           }
         }
 
