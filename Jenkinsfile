@@ -559,7 +559,7 @@ pipeline {
   // ─────────────────────────────────────────────
   post {
     success {
-      node('any') {
+      node('') {
         script {
           def totalMs = System.currentTimeMillis() - (env.PIPELINE_START as Long)
           recordMetrics(stage: 'pipeline', result: 'success', durationMs: totalMs)
@@ -573,7 +573,7 @@ pipeline {
       )
     }
     failure {
-      node('any') {
+      node('') {
         script {
           def totalMs = System.currentTimeMillis() - (env.PIPELINE_START as Long)
           recordMetrics(stage: 'pipeline', result: 'failure', durationMs: totalMs)
