@@ -335,25 +335,25 @@ pipeline {
         stage('Frontend') {
           when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { buildAndPush('frontend', HARBOR, PROJECT) }
+          steps { buildAndPush('frontend',  env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
         stage('Gateway') {
           when { anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { buildAndPush('gateway', HARBOR, PROJECT) }
+          steps { buildAndPush('gateway',  env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
         stage('User Service') {
           when { anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { buildAndPush('user-service', HARBOR, PROJECT) }
+          steps { buildAndPush('user-service',  env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
         stage('Order Service') {
           when { anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { buildAndPush('order-service', HARBOR, PROJECT) }
+          steps { buildAndPush('order-service',  env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
       }
