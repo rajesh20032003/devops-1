@@ -371,25 +371,25 @@ pipeline {
         stage('Sign Frontend') {
           when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { signImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps { SignImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
         stage('Sign Gateway') {
           when { anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { signImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps { SignImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
         stage('Sign User Service') {
           when { anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { signImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps { SignImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
         stage('Sign Order Service') {
           when { anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { signImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps { SignImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
         }
 
       }
