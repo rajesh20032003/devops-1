@@ -578,6 +578,10 @@ EOF
 
   }
 }
+    // ─────────────────────────────────────────────
+    // STAGE 9: Trivy Image Scan (from Harbor)
+    // ─────────────────────────────────────────────
+
  
  stage('Trivy Scan') {
       parallel {
@@ -635,190 +639,88 @@ EOF
         }
       }
     }
-    // ─────────────────────────────────────────────
-    // STAGE 9: Trivy Image Scan (from Harbor)
-    // ─────────────────────────────────────────────
 
     // ─────────────────────────────────────────────
     // STAGE 10: Generate SBOM and push to Harbor
     // ─────────────────────────────────────────────
-    stage('Generate SBOM') {
-      parallel {
+   stage('Generate SBOM') {
+    parallel {
 
-        stage('SBOM Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=frontend
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  -o cyclonedx-json \
-                  > sbom-${SERVICE}.json
-              '''
-            }
-          }
-          post {
-            always {
-              archiveArtifacts artifacts: 'sbom-frontend.json', allowEmptyArchive: true
-              stash name: 'sbom-frontend', includes: 'sbom-frontend.json', allowEmpty: true
-            }
+      stage('Frontend') {
+        when {
+          anyOf {
+            changeset "frontend/**"
+            buildingTag()
+            branch 'main'
           }
         }
-
-        stage('SBOM Gateway') {
-          when {
-            anyOf {
-              changeset "gateway/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=gateway
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  -o cyclonedx-json \
-                  > sbom-${SERVICE}.json
-              '''
-            }
-          }
-          post {
-            always {
-              archiveArtifacts artifacts: 'sbom-gateway.json', allowEmptyArchive: true
-              stash name: 'sbom-gateway', includes: 'sbom-gateway.json', allowEmpty: true
-            }
-          }
+        agent any
+         steps {
+          generateSbom(
+            'frontend',
+            env.HARBOR_REGISTRY,
+            env.HARBOR_PROJECT
+          )
         }
-
-        stage('SBOM User Service') {
-          when {
-            anyOf {
-              changeset "user-service/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=user-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  -o cyclonedx-json \
-                  > sbom-${SERVICE}.json
-              '''
-            }
-          }
-          post {
-            always {
-              archiveArtifacts artifacts: 'sbom-user-service.json', allowEmptyArchive: true
-              stash name: 'sbom-user-service', includes: 'sbom-user-service.json', allowEmpty: true
-            }
-          }
-        }
-
-        stage('SBOM Order Service') {
-          when {
-            anyOf {
-              changeset "order-service/**"
-              buildingTag()
-              branch 'main'
-            }
-          }
-          agent any
-          steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=order-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                SYFT_REGISTRY_INSECURE_USE_HTTP=true \
-                SYFT_REGISTRY_AUTH_USERNAME=$HARBOR_USER \
-                SYFT_REGISTRY_AUTH_PASSWORD=$HARBOR_PASS \
-                SYFT_REGISTRY_AUTH_AUTHORITY=$HARBOR_REGISTRY \
-                syft $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG \
-                  -o cyclonedx-json \
-                  > sbom-${SERVICE}.json
-              '''
-            }
-          }
-          post {
-            always {
-              archiveArtifacts artifacts: 'sbom-order-service.json', allowEmptyArchive: true
-              stash name: 'sbom-order-service', includes: 'sbom-order-service.json', allowEmpty: true
-            }
-          }
-        }
-
       }
+
+      stage('Gateway') {
+        when {
+          anyOf {
+            changeset "gateway/**"
+            buildingTag()
+            branch 'main'
+          }
+        }
+        agent any
+        steps {
+          generateSbom(
+            'gateway',
+            env.HARBOR_REGISTRY,
+            env.HARBOR_PROJECT
+          )
+        }
+      }
+
+      stage('User Service') {
+        when {
+          anyOf {
+            changeset "user-service/**"
+            buildingTag()
+            branch 'main'
+          }
+        }
+        agent any
+        steps {
+          generateSbom(
+            'user-service',
+            env.HARBOR_REGISTRY,
+            env.HARBOR_PROJECT
+          )
+        }
+      }
+
+      stage('Order Service') {
+        when {
+          anyOf {
+            changeset "order-service/**"
+            buildingTag()
+            branch 'main'
+          }
+        }
+        agent any
+        steps {
+          generateSbom(
+            'order-service',
+            env.HARBOR_REGISTRY,
+            env.HARBOR_PROJECT
+          )
+        }
+      }
+
     }
+
+  }
 
     // ─────────────────────────────────────────────
     // STAGE 11: Upload Reports to Harbor
@@ -920,7 +822,7 @@ EOF
             anyOf {
               changeset "frontend/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
@@ -968,7 +870,7 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
@@ -1016,7 +918,7 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
@@ -1064,7 +966,7 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
@@ -1121,7 +1023,7 @@ EOF
             anyOf {
               changeset "frontend/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
@@ -1169,7 +1071,7 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
@@ -1217,7 +1119,7 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
-              branch 'main'
+             // branch 'main'
             }
           }
           agent any
@@ -1265,7 +1167,7 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
-              branch 'main'
+              //branch 'main'
             }
           }
           agent any
