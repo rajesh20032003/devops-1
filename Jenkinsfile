@@ -802,25 +802,25 @@ pipeline {
         stage('Promote Frontend') {
           when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { promoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps { PromoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote Gateway') {
           when { anyOf { changeset 'gateway/**'; buildingTag()  } }
           agent any
-          steps { promoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps { PromoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote User Service') {
           when { anyOf { changeset 'user-service/**'; buildingTag() } }
           agent any
-          steps { promoteImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps { PromoteImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote Order Service') {
           when { anyOf { changeset 'order-service/**'; buildingTag() } }
           agent any
-          steps { promoteImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps { PromoteImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
       }
