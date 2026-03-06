@@ -86,7 +86,7 @@ pipeline {
         // order-service needs an extra jest cache clear before tests
 
         stage('Gateway') {
-          when  { anyOf { changeset "**/gateway/**"; buildingTag() } }
+          when  { anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
           steps { Nodequalitycheck('gateway') }
         }
@@ -109,7 +109,7 @@ pipeline {
 
         // ── Frontend is different: no unit tests, only HTML lint ─────────────
         stage('Frontend') {
-          when  { anyOf { changeset "**/frontend/**"; buildingTag() } }
+          when  { anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
             dir('frontend') {
