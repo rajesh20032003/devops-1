@@ -18,9 +18,13 @@ pipeline {
 
   stages {
 
+    // ─────────────────────────────────────────────
+    // STAGE 1: Clean
+    // ─────────────────────────────────────────────
     stage('Clean') {
       agent any
       steps {
+        script { env.PIPELINE_START = System.currentTimeMillis() as String }
         sh '''
           rm -rf gateway/node_modules
           rm -rf user-service/node_modules
@@ -30,17 +34,22 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 2: Secret Scan
+    // ─────────────────────────────────────────────
     stage('Secret Scan - Gitleaks') {
       agent any
       steps {
-        sh '''
-          gitleaks detect \
-            --baseline-path baseline.json \
-            --no-git \
-            --source . \
-            --redact \
-            --report-path gitleaks-report.json
-        '''
+        measureStage('Secret_Scan') {
+          sh '''
+            gitleaks detect \
+              --baseline-path baseline.json \
+              --no-git \
+              --source . \
+              --redact \
+              --report-path gitleaks-report.json
+          '''
+        }
       }
       post {
         always {
@@ -51,8 +60,12 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 3: Dependency Scan
+    // ─────────────────────────────────────────────
     stage('Dependency Scan (Trivy Repo)') {
       when {
+        beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
@@ -61,13 +74,15 @@ pipeline {
       }
       agent any
       steps {
-        sh '''
-          trivy fs . \
-            --exit-code 1 --no-progress \
-            --severity HIGH,CRITICAL --ignore-unfixed \
-            --scanners vuln --pkg-types library \
-            --format json --output trivy-deps-report.json
-        '''
+        measureStage('Dependency_Scan') {
+          sh '''
+            trivy fs . \
+              --exit-code 1 --no-progress \
+              --severity HIGH,CRITICAL --ignore-unfixed \
+              --scanners vuln --pkg-types library \
+              --format json --output trivy-deps-report.json
+          '''
+        }
       }
       post {
         always {
@@ -78,55 +93,58 @@ pipeline {
       }
     }
 
-      stage('Quality Checks - lint, unit test') {
+    // ─────────────────────────────────────────────
+    // STAGE 4: Quality Checks
+    // Duration tracked inside nodeQualityCheck via measureStage
+    // ─────────────────────────────────────────────
+    stage('Quality Checks - lint, unit test') {
       parallel {
 
         stage('Gateway') {
-          when  { beforeAgent true; anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
-          steps {
-              Nodequalitycheck('gateway')
-          }
+          steps { Nodequalitycheck('gateway') }
         }
 
         stage('User Service') {
-          when  { beforeAgent true; anyOf { changeset "**/user-service/**"; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset "**/user-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
-          steps {
-           
-              Nodequalitycheck('user-service')
-            
-          }
+          steps { Nodequalitycheck('user-service') }
         }
 
         stage('Order Service') {
-          when  { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
           steps {
-              Nodequalitycheck('order-service') {
-                sh 'npx jest --clearCache'
-              }
+            Nodequalitycheck('order-service') {
+              sh 'npx jest --clearCache'
+            }
           }
         }
 
         stage('Frontend') {
-          when  { beforeAgent true; anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() } }
           agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
           steps {
-            
+            measureStage('Quality_Check_frontend') {
               dir('frontend') {
                 sh 'rm -rf node_modules'
                 sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
                 sh 'npm run lint:html || true'
               }
+            }
           }
         }
 
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 5: SonarQube Analysis
+    // ─────────────────────────────────────────────
     stage('SonarQube Analysis') {
       when {
+        beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
@@ -136,41 +154,47 @@ pipeline {
       agent any
       environment { SONAR_TOKEN = credentials('sonar-token') }
       steps {
-        withSonarQubeEnv('sonarqube') {
-          sh '''
-            rm -rf $WORKSPACE/.scannerwork
-            mkdir -p $WORKSPACE/.scannerwork
-            chmod 777 $WORKSPACE/.scannerwork
+        measureStage('SonarQube_Analysis') {
+          withSonarQubeEnv('sonarqube') {
+            sh '''
+              rm -rf $WORKSPACE/.scannerwork
+              mkdir -p $WORKSPACE/.scannerwork
+              chmod 777 $WORKSPACE/.scannerwork
 
-            docker run --rm \
-              -e SONAR_TOKEN=$SONAR_TOKEN \
-              -e SONAR_HOST_URL=http://35.200.201.42:9000 \
-              --volumes-from $(cat /etc/hostname) \
-              sonarsource/sonar-scanner-cli:latest \
-              -Dsonar.projectBaseDir=$WORKSPACE \
-              -Dsonar.projectKey=micro-dash \
-              -Dsonar.projectName="Microservices Dashboard" \
-              -Dsonar.sources=gateway,user-service,order-service \
-              -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
-              -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
-              -Dsonar.scm.disabled=true \
-              -Dsonar.working.directory=$WORKSPACE/.scannerwork
-          '''
-          script {
-            def taskFile = readFile("${WORKSPACE}/.scannerwork/report-task.txt")
-            def ceTaskId = taskFile.readLines()
-              .find { it.startsWith('ceTaskId=') }
-              ?.replace('ceTaskId=', '')
-              ?.trim()
-            env.SONAR_TASK_ID = ceTaskId
-            echo "SonarQube Task ID: ${ceTaskId}"
+              docker run --rm \
+                -e SONAR_TOKEN=$SONAR_TOKEN \
+                -e SONAR_HOST_URL=http://35.200.201.42:9000 \
+                --volumes-from $(cat /etc/hostname) \
+                sonarsource/sonar-scanner-cli:latest \
+                -Dsonar.projectBaseDir=$WORKSPACE \
+                -Dsonar.projectKey=micro-dash \
+                -Dsonar.projectName="Microservices Dashboard" \
+                -Dsonar.sources=gateway,user-service,order-service \
+                -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/__test__/** \
+                -Dsonar.javascript.lcov.reportPaths=gateway/coverage/lcov.info,user-service/coverage/lcov.info,order-service/coverage/lcov.info \
+                -Dsonar.scm.disabled=true \
+                -Dsonar.working.directory=$WORKSPACE/.scannerwork
+            '''
+            script {
+              def taskFile = readFile("${WORKSPACE}/.scannerwork/report-task.txt")
+              def ceTaskId = taskFile.readLines()
+                .find { it.startsWith('ceTaskId=') }
+                ?.replace('ceTaskId=', '')
+                ?.trim()
+              env.SONAR_TASK_ID = ceTaskId
+              echo "SonarQube Task ID: ${ceTaskId}"
+            }
           }
         }
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 6: Quality Gate
+    // ─────────────────────────────────────────────
     stage('Quality Gate - SonarQube') {
       when {
+        beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
@@ -179,16 +203,22 @@ pipeline {
       }
       agent any
       steps {
-        withSonarQubeEnv('sonarqube') {
-          timeout(time: 5, unit: 'MINUTES') {
-            waitForQualityGate abortPipeline: true
+        measureStage('Quality_Gate') {
+          withSonarQubeEnv('sonarqube') {
+            timeout(time: 5, unit: 'MINUTES') {
+              waitForQualityGate abortPipeline: true
+            }
           }
         }
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 7: Set Image Version
+    // ─────────────────────────────────────────────
     stage('Set Image Version') {
       when {
+        beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
@@ -204,83 +234,159 @@ pipeline {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 8: Build and Push to Harbor
+    // ─────────────────────────────────────────────
     stage('Build and Push Images') {
       parallel {
+
         stage('Frontend') {
-          when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { BuildAndPush('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Build_Push_frontend') {
+              BuildAndPush('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Gateway') {
-          when { anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { BuildAndPush('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Build_Push_gateway') {
+              BuildAndPush('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('User Service') {
-          when { anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { BuildAndPush('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Build_Push_user_service') {
+              BuildAndPush('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Order Service') {
-          when { anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { BuildAndPush('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Build_Push_order_service') {
+              BuildAndPush('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 9: Trivy Image Scan
+    // ─────────────────────────────────────────────
     stage('Trivy Scan') {
       parallel {
+
         stage('Scan Frontend') {
-          when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { trivyScan('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Trivy_Scan_frontend') {
+              trivyScan('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Scan Gateway') {
-          when { anyOf { changeset 'gateway/**'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag() } }
           agent any
-          steps { trivyScan('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Trivy_Scan_gateway') {
+              trivyScan('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Scan User Service') {
-          when { anyOf { changeset 'user-service/**'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag() } }
           agent any
-          steps { trivyScan('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Trivy_Scan_user_service') {
+              trivyScan('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Scan Order Service') {
-          when { anyOf { changeset 'order-service/**'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag() } }
           agent any
-          steps { trivyScan('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Trivy_Scan_order_service') {
+              trivyScan('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 10: Generate SBOM
+    // ─────────────────────────────────────────────
     stage('Generate SBOM') {
       parallel {
+
         stage('Frontend') {
-          when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { generateSbom('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('SBOM_frontend') {
+              generateSbom('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Gateway') {
-          when { anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { generateSbom('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('SBOM_gateway') {
+              generateSbom('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('User Service') {
-          when { anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { generateSbom('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('SBOM_user_service') {
+              generateSbom('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
         stage('Order Service') {
-          when { anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { generateSbom('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('SBOM_order_service') {
+              generateSbom('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
+
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 11: Upload Reports to Harbor
+    // ─────────────────────────────────────────────
     stage('Upload Reports to Harbor') {
       when {
+        beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
@@ -289,110 +395,152 @@ pipeline {
       }
       agent any
       steps {
-        withCredentials([
-          usernamePassword(
-            credentialsId: 'harbor-credential',
-            usernameVariable: 'HARBOR_USER',
-            passwordVariable: 'HARBOR_PASS'
-          )
-        ]) {
-          script {
-            sh 'mkdir -p reports'
-            // FIX: single graceful loop replaces the duplicate hard-unstash block
-            ['gitleaks-report', 'trivy-deps-report',
-             'coverage-gateway', 'coverage-user-service', 'coverage-order-service',
-             'sbom-frontend', 'sbom-gateway', 'sbom-user-service', 'sbom-order-service'
-            ].each { stashName ->
-              try   { unstash stashName; echo "Unstashed: ${stashName}" }
-              catch (e) { echo "Skipping ${stashName} - not available" }
+        measureStage('Upload_Reports') {
+          withCredentials([
+            usernamePassword(
+              credentialsId: 'harbor-credential',
+              usernameVariable: 'HARBOR_USER',
+              passwordVariable: 'HARBOR_PASS'
+            )
+          ]) {
+            script {
+              sh 'mkdir -p reports'
+              ['gitleaks-report', 'trivy-deps-report',
+               'coverage-gateway', 'coverage-user-service', 'coverage-order-service',
+               'sbom-frontend', 'sbom-gateway', 'sbom-user-service', 'sbom-order-service'
+              ].each { stashName ->
+                try   { unstash stashName; echo "Unstashed: ${stashName}" }
+                catch (e) { echo "Skipping ${stashName} - not available" }
+              }
             }
-          }
-          sh '''
-            set -x
-            echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-              -u "$HARBOR_USER" --password-stdin
+            sh '''
+              set -x
+              echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
+                -u "$HARBOR_USER" --password-stdin
 
-            if [ -f gitleaks-report.json ]; then
-              oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:gitleaks-${BUILD_NUMBER} \
-                --plain-http gitleaks-report.json:application/json
-            fi
-
-            if [ -f trivy-deps-report.json ]; then
-              oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:trivy-deps-${BUILD_NUMBER} \
-                --plain-http trivy-deps-report.json:application/json
-            fi
-
-            for SERVICE in frontend gateway user-service order-service; do
-              if [ -f sbom-${SERVICE}.json ]; then
-                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:sbom-${SERVICE}-${BUILD_NUMBER} \
-                  --plain-http sbom-${SERVICE}.json:application/json
+              if [ -f gitleaks-report.json ]; then
+                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:gitleaks-${BUILD_NUMBER} \
+                  --plain-http gitleaks-report.json:application/json
               fi
-            done
-          '''
+
+              if [ -f trivy-deps-report.json ]; then
+                oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:trivy-deps-${BUILD_NUMBER} \
+                  --plain-http trivy-deps-report.json:application/json
+              fi
+
+              for SERVICE in frontend gateway user-service order-service; do
+                if [ -f sbom-${SERVICE}.json ]; then
+                  oras push $HARBOR_REGISTRY/$HARBOR_PROJECT/reports:sbom-${SERVICE}-${BUILD_NUMBER} \
+                    --plain-http sbom-${SERVICE}.json:application/json
+                fi
+              done
+            '''
+          }
         }
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 12: Sign Images
+    // ─────────────────────────────────────────────
     stage('Sign Images') {
       parallel {
 
         stage('Sign Frontend') {
-          when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { SignImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Sign_frontend') {
+              SignImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
 
         stage('Sign Gateway') {
-          when { anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { SignImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Sign_gateway') {
+              SignImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
 
         stage('Sign User Service') {
-          when { anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { SignImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Sign_user_service') {
+              SignImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
 
         stage('Sign Order Service') {
-          when { anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { SignImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT) }
+          steps {
+            measureStage('Sign_order_service') {
+              SignImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+            }
+          }
         }
 
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 13: Promote Harbor → ECR
+    // ─────────────────────────────────────────────
     stage('Promote Images') {
       parallel {
 
         stage('Promote Frontend') {
-          when { anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
           agent any
-          steps { PromoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps {
+            measureStage('Promote_frontend') {
+              PromoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            }
+          }
         }
 
         stage('Promote Gateway') {
-          when { anyOf { changeset 'gateway/**'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag() } }
           agent any
-          steps { PromoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps {
+            measureStage('Promote_gateway') {
+              PromoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            }
+          }
         }
 
         stage('Promote User Service') {
-          when { anyOf { changeset 'user-service/**'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag() } }
           agent any
-          steps { PromoteImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps {
+            measureStage('Promote_user_service') {
+              PromoteImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            }
+          }
         }
 
         stage('Promote Order Service') {
-          when { anyOf { changeset 'order-service/**'; buildingTag() } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag() } }
           agent any
-          steps { PromoteImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
+          steps {
+            measureStage('Promote_order_service') {
+              PromoteImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            }
+          }
         }
 
       }
     }
 
+    // ─────────────────────────────────────────────
+    // STAGE 14: Cleanup
+    // ─────────────────────────────────────────────
     stage('Cleanup') {
       agent any
       steps {
@@ -406,8 +554,18 @@ pipeline {
 
   }
 
+  // ─────────────────────────────────────────────
+  // POST: Push final build result + total pipeline duration
+  // ─────────────────────────────────────────────
   post {
     success {
+      node('any') {
+        script {
+          def totalMs = System.currentTimeMillis() - (env.PIPELINE_START as Long)
+          recordMetrics(stage: 'pipeline', result: 'success', durationMs: totalMs)
+          echo "Total pipeline duration: ${totalMs / 1000}s"
+        }
+      }
       emailext(
         subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body:    "Build succeeded!\nURL: ${env.BUILD_URL}",
@@ -415,6 +573,13 @@ pipeline {
       )
     }
     failure {
+      node('any') {
+        script {
+          def totalMs = System.currentTimeMillis() - (env.PIPELINE_START as Long)
+          recordMetrics(stage: 'pipeline', result: 'failure', durationMs: totalMs)
+          echo "Total pipeline duration: ${totalMs / 1000}s"
+        }
+      }
       emailext(
         subject:     "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
         body:        "Build FAILED!\nURL: ${env.BUILD_URL}\nConsole: ${env.BUILD_URL}console",
