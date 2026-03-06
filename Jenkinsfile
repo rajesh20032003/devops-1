@@ -796,203 +796,36 @@ pipeline {
     // ─────────────────────────────────────────────
     // STAGE 13: Promote Harbor → ECR (production)
     // ─────────────────────────────────────────────
-    stage('Promote Images') {
+   stage('Promote Images') {
       parallel {
 
         stage('Promote Frontend') {
-          when {
-            anyOf {
-              changeset "frontend/**"
-              buildingTag()
-              //branch 'main'
-            }
-          }
+          when { anyOf { changeset 'frontend/**'; buildingTag() } }
           agent any
-          steps {
-            withCredentials([
-              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=frontend
-                CI_TAG=ci-${BUILD_NUMBER}
-
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
-
-                docker tag \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-
-                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
-              '''
-            }
-          }
+          steps { promoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote Gateway') {
-          when {
-            anyOf {
-              changeset "gateway/**"
-              buildingTag()
-              //branch 'main'
-            }
-          }
+          when { anyOf { changeset 'gateway/**'; buildingTag() } }
           agent any
-          steps {
-            withCredentials([
-              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=gateway           # ← fixed (was frontend before)
-                CI_TAG=ci-${BUILD_NUMBER}
-
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
-
-                docker tag \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-
-                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
-              '''
-            }
-          }
+          steps { promoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote User Service') {
-          when {
-            anyOf {
-              changeset "user-service/**"
-              buildingTag()
-             // branch 'main'
-            }
-          }
+          when { anyOf { changeset 'user-service/**'; buildingTag() } }
           agent any
-          steps {
-            withCredentials([
-              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=user-service      # ← fixed (was frontend before)
-                CI_TAG=ci-${BUILD_NUMBER}
-
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
-
-                docker tag \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-
-                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
-              '''
-            }
-          }
+          steps { promoteImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
         stage('Promote Order Service') {
-          when {
-            anyOf {
-              changeset "order-service/**"
-              buildingTag()
-              //branch 'main'
-            }
-          }
+          when { anyOf { changeset 'order-service/**'; buildingTag() } }
           agent any
-          steps {
-            withCredentials([
-              [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-ecr-credentials'],
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=order-service     # ← fixed (was frontend before)
-                CI_TAG=ci-${BUILD_NUMBER}
-
-                if [ -n "$TAG_NAME" ]; then
-                  FINAL_TAG=$TAG_NAME
-                else
-                  FINAL_TAG=dev-${BUILD_NUMBER}
-                fi
-
-                echo "$HARBOR_PASS" | docker login $HARBOR_REGISTRY \
-                  -u "$HARBOR_USER" --password-stdin
-
-                aws ecr get-login-password --region ap-south-1 \
-                  | docker login --username AWS --password-stdin $ECR_REGISTRY
-
-                docker pull $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG
-
-                docker tag \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$CI_TAG \
-                  $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-
-                docker push $ECR_REGISTRY/$SERVICE:$FINAL_TAG
-                echo "Promoted $CI_TAG → $FINAL_TAG"
-              '''
-            }
-          }
+          steps { promoteImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY) }
         }
 
       }
     }
+
 
     // ─────────────────────────────────────────────
     // STAGE 14: Cleanup
