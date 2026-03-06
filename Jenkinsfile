@@ -1,3 +1,4 @@
+@Library('shared-lib') _
 pipeline {
   agent none
 
@@ -577,13 +578,9 @@ EOF
 
   }
 }
-
-    // ─────────────────────────────────────────────
-    // STAGE 9: Trivy Image Scan (from Harbor)
-    // ─────────────────────────────────────────────
-    stage('Trivy Scan') {
+ 
+ stage('Trivy Scan') {
       parallel {
-
         stage('Scan Frontend') {
           when {
             anyOf {
@@ -594,30 +591,7 @@ EOF
           }
           agent any
           steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=frontend
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                trivy image \
-                  --scanners vuln \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --insecure \
-                  --username $HARBOR_USER \
-                  --password $HARBOR_PASS \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-              '''
-            }
+            trivyScan('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
           }
         }
 
@@ -626,35 +600,11 @@ EOF
             anyOf {
               changeset "gateway/**"
               buildingTag()
-              branch 'main'
             }
           }
           agent any
           steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=gateway
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                trivy image \
-                  --scanners vuln \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --insecure \
-                  --username $HARBOR_USER \
-                  --password $HARBOR_PASS \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-              '''
-            }
+            trivyScan('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
           }
         }
 
@@ -663,35 +613,11 @@ EOF
             anyOf {
               changeset "user-service/**"
               buildingTag()
-              branch 'main'
             }
           }
           agent any
           steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=user-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                trivy image \
-                  --scanners vuln \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --insecure \
-                  --username $HARBOR_USER \
-                  --password $HARBOR_PASS \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-              '''
-            }
+            trivyScan('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
           }
         }
 
@@ -700,40 +626,18 @@ EOF
             anyOf {
               changeset "order-service/**"
               buildingTag()
-              branch 'main'
             }
           }
           agent any
           steps {
-            withCredentials([
-              usernamePassword(
-                credentialsId: 'harbor-credential',
-                usernameVariable: 'HARBOR_USER',
-                passwordVariable: 'HARBOR_PASS'
-              )
-            ]) {
-              sh '''
-                set -x
-                SERVICE=order-service
-                IMAGE_TAG=ci-${BUILD_NUMBER}
-
-                trivy image \
-                  --scanners vuln \
-                  --exit-code 1 \
-                  --severity CRITICAL \
-                  --skip-version-check \
-                  --image-src remote \
-                  --insecure \
-                  --username $HARBOR_USER \
-                  --password $HARBOR_PASS \
-                  $HARBOR_REGISTRY/$HARBOR_PROJECT/$SERVICE:$IMAGE_TAG
-              '''
-            }
+            trivyScan('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
           }
         }
-
       }
     }
+    // ─────────────────────────────────────────────
+    // STAGE 9: Trivy Image Scan (from Harbor)
+    // ─────────────────────────────────────────────
 
     // ─────────────────────────────────────────────
     // STAGE 10: Generate SBOM and push to Harbor
