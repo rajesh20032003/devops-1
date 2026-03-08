@@ -97,48 +97,54 @@ pipeline {
     // STAGE 4: Quality Checks
     // Duration tracked inside nodeQualityCheck via measureStage
     // ─────────────────────────────────────────────
-    stage('Quality Checks - lint, unit test') {
+   stage('Quality Checks - lint, unit test') {
       parallel {
 
         stage('Gateway') {
-          when { beforeAgent true; anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() } }
-          agent { docker { image 'node:22-alpine'; args '-v npm-cache-gateway:/home/node/.npm' } }
-          steps { Nodequalitycheck('gateway') }
+          when {
+            beforeAgent true
+            anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() }
+          }
+          // NO agent block here — nodeQualityCheck creates its own K8s pod
+          steps {
+            nodeQualityCheck('gateway')
+          }
         }
 
         stage('User Service') {
-          when { beforeAgent true; anyOf { changeset "**/user-service/**"; buildingTag() } }
-          agent { docker { image 'node:22-alpine'; args '-v npm-cache-user-service:/home/node/.npm' } }
-          steps { Nodequalitycheck('user-service') }
+          when {
+            beforeAgent true
+            anyOf { changeset "**/user-service/**"; buildingTag() }
+          }
+          steps {
+            nodeQualityCheck('user-service')
+          }
         }
 
         stage('Order Service') {
-          when { beforeAgent true; anyOf { changeset "**/order-service/**"; buildingTag() } }
-          agent { docker { image 'node:22-alpine'; args '-v npm-cache-order-service:/home/node/.npm' } }
+          when {
+            beforeAgent true
+            anyOf { changeset "**/order-service/**"; buildingTag() }
+          }
           steps {
-            Nodequalitycheck('order-service') {
+            nodeQualityCheck('order-service') {
               sh 'npx jest --clearCache'
             }
           }
         }
 
         stage('Frontend') {
-          when { beforeAgent true; anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() } }
-          agent { docker { image 'node:22-alpine'; args '-v npm-cache-frontend:/home/node/.npm' } }
+          when {
+            beforeAgent true
+            anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() }
+          }
           steps {
-            measureStage('Quality_Check_frontend') {
-              dir('frontend') {
-                sh 'rm -rf node_modules'
-                sh 'npm ci --prefer-offline --no-audit --cache /home/node/.npm'
-                sh 'npm run lint:html || true'
-              }
-            }
+            nodeQualityCheck('frontend')
           }
         }
 
       }
     }
-
     // ─────────────────────────────────────────────
     // STAGE 5: SonarQube Analysis
     // ─────────────────────────────────────────────
