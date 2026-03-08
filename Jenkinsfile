@@ -107,17 +107,17 @@ pipeline {
           }
           // NO agent block here — nodeQualityCheck creates its own K8s pod
           steps {
-            nodeQualityCheck('gateway')
+            Nodequalitycheck('gateway')
           }
         }
 
-        stage('User Service') {
+        stage('User Service!') {
           when {
             beforeAgent true
             anyOf { changeset "**/user-service/**"; buildingTag() }
           }
           steps {
-            nodeQualityCheck('user-service')
+            Nodequalitycheck('user-service')
           }
         }
 
@@ -127,7 +127,7 @@ pipeline {
             anyOf { changeset "**/order-service/**"; buildingTag() }
           }
           steps {
-            nodeQualityCheck('order-service') {
+            Nodequalitycheck('order-service') {
               sh 'npx jest --clearCache'
             }
           }
@@ -139,7 +139,7 @@ pipeline {
             anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() }
           }
           steps {
-            nodeQualityCheck('frontend')
+            Nodequalitycheck('frontend')
           }
         }
 
