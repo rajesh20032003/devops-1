@@ -105,13 +105,15 @@ pipeline {
             beforeAgent true
             anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() }
           }
-          // NO agent block here — nodeQualityCheck creates its own K8s pod
+          // no agent block — nodeQualityCheck creates K8s pod internally
           steps {
             Nodequalitycheck('gateway')
+            // equivalent to: nodeQualityCheck('gateway', null, false)
+            // lintOnly defaults to false → runs full lint + tests + coverage
           }
         }
 
-        stage('User Service!') {
+        stage('User Service') {
           when {
             beforeAgent true
             anyOf { changeset "**/user-service/**"; buildingTag() }
@@ -127,6 +129,8 @@ pipeline {
             anyOf { changeset "**/order-service/**"; buildingTag() }
           }
           steps {
+            // passes extraSteps closure to clear jest cache before running
+            // jest cache can cause flaky tests — clearing ensures clean run
             Nodequalitycheck('order-service') {
               sh 'npx jest --clearCache'
             }
@@ -139,7 +143,13 @@ pipeline {
             anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() }
           }
           steps {
-            Nodequalitycheck('frontend')
+            // lintOnly = true:
+            //   runs npm run lint:html only
+            //   skips tests (frontend has none)
+            //   skips coverage stash (nothing to stash)
+            //   still gets K8s pod isolation ✅
+            //   still pushes metrics to Grafana ✅
+            Nodequalitycheck('frontend', null, true)
           }
         }
 
