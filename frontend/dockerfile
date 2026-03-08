@@ -1,4 +1,4 @@
-FROM nginx:alpine
+FROM nginx:stable-alpine
 # In frontend/Dockerfile, add this after your FROM line
 RUN apk update && apk upgrade --no-cache
 COPY index.html /usr/share/nginx/html/index.html
