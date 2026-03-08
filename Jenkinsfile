@@ -116,7 +116,7 @@ pipeline {
         stage('User Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/user-service/**"; buildingTag() }
+            anyOf { changeset "**/user-service/**"; buildingTag(); branch 'main' }
           }
           steps {
             Nodequalitycheck('user-service')
@@ -126,7 +126,7 @@ pipeline {
         stage('Order Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/order-service/**"; buildingTag() }
+            anyOf { changeset "**/order-service/**"; buildingTag(); branch 'main' }
           }
           steps {
             // passes extraSteps closure to clear jest cache before running
@@ -164,7 +164,7 @@ pipeline {
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
-          buildingTag()
+          buildingTag(); branch 'main'
         }
       }
       agent any
@@ -214,7 +214,7 @@ pipeline {
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
-          buildingTag()
+          buildingTag(); branch 'main'
         }
       }
       agent any
