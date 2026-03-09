@@ -1,0 +1,60 @@
+1.used harbor vm 
+2. installed docker ,git ,minikube on the harbor vm 
+3. modified minikube config file -> server ip to use harbor vm external ip
+4. then we route the traffic that are hitting on the harbor vm eip that are releated to k8s to minikube internal docker ip 
+5. then we copied the kube config file and puted on jenkins vm so that jenkins can able to establish connection to harbor vm 
+6.the kube config file contains server ip of harbor vms and cert to verify that is trusted k8 ,then it have client id and key that is used by jenkins to establish the connection to minikube cluster
+7. then we modified the jenkins cloud section and added the harbor ip ,jenkins ip and jenkins tunnel ,name space that are created in minikube cluster 
+* created a service role named jenkins in jenkins namespace so that jenkins able to create pods 
+* then we binded that role to cluster admin role so that it can have required permission to perform the creation deletion kind of things ,although its not good thing to bind cluster admin role ,in prod we can create a new role with less no of permission but for learning purpose is okay
+8. then added pod template jnlp ,node ,docker....
+9. and jenkins uses jnlp to establish the connection between the pod to the jenkins controller node 
+10 .jenkins will send the data through the tunnel to the jnlp container
+
+what i still not understand his why we creating the jnlp container how jenkins connects to it ,how the other containers connect to jnlp container and how other containers getting the data 
+is it necessary to create jnlp container
+add why we are putting the other containers docker .node to sleep 99d
+also dont understand how the container getting the data and required permission 
+
+
+**Complete flow one more time — crystal clear:**
+```
+1. You push code to GitHub
+
+2. GitHub webhook triggers Jenkins
+
+3. Jenkins reads Jenkinsfile:
+   agent { kubernetes { ... } }
+   "I need a K8s agent"
+
+4. Jenkins Kubernetes plugin reads kubeconfig credential
+   Calls Harbor VM K8s API: POST /api/v1/namespaces/jenkins/pods
+   "Create this pod with these 3 containers"
+
+5. Minikube schedules the pod on its node
+   Pulls images (cached after first time)
+   Starts all 3 containers simultaneously
+
+6. node container    → sleep 99d (waiting)
+   docker container  → sleep 99d (waiting)
+   jnlp container    → reads env vars → connects to 35.200.201.42:50000
+   "Jenkins I am agent jenkins-k8s-agent-abc123, ready!"
+
+7. Jenkins sees new agent come online
+   Starts sending the pipeline stages through the tunnel
+
+8. Stage: container('node') { sh 'npm test' }
+   Jenkins → tunnel → jnlp → kubectl exec → node container
+   node container runs: npm test
+   output → jnlp → tunnel → Jenkins console
+
+9. Stage: container('docker') { sh 'docker build .' }
+   Jenkins → tunnel → jnlp → kubectl exec → docker container
+   docker container runs: docker build .
+   Uses mounted /var/run/docker.sock to talk to host Docker
+   output → jnlp → tunnel → Jenkins console
+
+10. All stages done
+    Jenkins tells K8s API: DELETE pod jenkins-k8s-agent-abc123
+    Pod, all containers, all processes → gone
+    Clean slate for next build
