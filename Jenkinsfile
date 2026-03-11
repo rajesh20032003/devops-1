@@ -171,6 +171,11 @@ pipeline {
       environment { SONAR_TOKEN = credentials('sonar-token') }
       steps {
         measureStage('SonarQube_Analysis') {
+           script {
+        unstash name: 'coverage-gateway'
+        unstash name: 'coverage-user-service'
+        unstash name: 'coverage-order-service'
+      }
           withSonarQubeEnv('sonarqube') {
             sh '''
               rm -rf $WORKSPACE/.scannerwork
