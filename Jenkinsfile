@@ -657,18 +657,18 @@ pipeline {
               def project = "micro-dash"
 
               def instances = sh(
-                script: """
-                  aws ec2 describe-instances \
-                    --region ${region} \
-                    --filters \
-                      "Name=tag:Role,Values=app-server" \
-                      "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
-                      "Name=instance-state-name,Values=running" \
-                    --query 'Reservations[*].Instances[*].InstanceId' \
-                    --output text
-                """,
-                returnStdout: true
-              ).trim()
+                    script: """
+                      aws ec2 describe-instances \
+                        --region ${region} \
+                        --filters \
+                          "Name=tag:Role,Values=app-server" \
+                          "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
+                          "Name=instance-state-name,Values=running" \
+                        --query 'Reservations[*].Instances[*].InstanceId' \
+                        --output text | tr '\\t' ' '
+                    """,
+                    returnStdout: true
+                  ).trim()
 
               if (!instances) { error "No running EC2 instances found!" }
 
