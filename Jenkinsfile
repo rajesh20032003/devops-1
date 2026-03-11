@@ -559,224 +559,225 @@ pipeline {
       }
     }
 stage('Init Database') {
-  when { buildingTag() }
-  agent any
-  steps {
-    measureStage('Init_Database') {
-      withCredentials([[
-        $class: 'AmazonWebServicesCredentialsBinding',
-        credentialsId: 'aws-ecr-credentials'
-      ]]) {
-        script {
-          def region = "ap-south-1"
-          def project = "micro-dash"
+      when { buildingTag() }
+      agent any
+      steps {
+        measureStage('Init_Database') {
+          withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-ecr-credentials'
+          ]]) {
+            script {
+              def region = "ap-south-1"
+              def project = "micro-dash"
 
-          def instances = sh(
-            script: """
-              aws ec2 describe-instances \
-                --region ${region} \
-                --filters \
-                  "Name=tag:project,Values=${project}" \
-                  "Name=instance-state-name,Values=running" \
-                --query 'Reservations[*].Instances[*].InstanceId' \
-                --output text
-            """,
-            returnStdout: true
-          ).trim()
+              def instances = sh(
+                script: """
+                  aws ec2 describe-instances \
+                    --region ${region} \
+                    --filters \
+                      "Name=tag:project,Values=${project}" \
+                      "Name=instance-state-name,Values=running" \
+                    --query 'Reservations[*].Instances[*].InstanceId' \
+                    --output text
+                """,
+                returnStdout: true
+              ).trim()
 
-          def commandId = sh(
-            script: """
-              aws ssm send-command \
-                --region ${region} \
-                --instance-ids ${instances} \
-                --document-name "AWS-RunShellScript" \
-                --comment "Init DB" \
-                --parameters 'commands=[
-                  "set -e",
-                  "echo === DB Init start ===",
+              if (!instances) {
+                error "No running EC2 instances found!"
+              }
 
-                  "USER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/user-service/db --region ${region} --query SecretString --output text)",
-                  "USER_HOST=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'host\\'])\\")",
-                  "USER_USER=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'username\\'])\\")",
-                  "USER_PASS=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'password\\'])\\")",
-                  "USER_DB=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'dbname\\'])\\")",
+              echo "Initializing DB on instances: ${instances}"
 
-                  "ORDER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/order-service/db --region ${region} --query SecretString --output text)",
-                  "ORDER_HOST=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'host\\'])\\")",
-                  "ORDER_USER=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'username\\'])\\")",
-                  "ORDER_PASS=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'password\\'])\\")",
-                  "ORDER_DB=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'dbname\\'])\\")",
-
-                  "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c \\"CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, created_at TIMESTAMP DEFAULT NOW());\\"",
-                  "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c \\"INSERT INTO users (name,email) VALUES (\\'Alice\\',\\'alice@example.com\\'),(\\'Bob\\',\\'bob@example.com\\'),(\\'Carol\\',\\'carol@example.com\\'),(\\'Dave\\',\\'dave@example.com\\') ON CONFLICT DO NOTHING;\\"",
-                  "echo Users DB done",
-
-                  "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c \\"CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(50) DEFAULT \\'pending\\', created_at TIMESTAMP DEFAULT NOW());\\"",
-                  "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c \\"INSERT INTO orders (user_id,product,amount,status) VALUES (1,\\'Laptop\\',999.99,\\'completed\\'),(2,\\'Phone\\',599.99,\\'pending\\'),(3,\\'Tablet\\',399.99,\\'completed\\'),(4,\\'Headphones\\',149.99,\\'shipped\\') ON CONFLICT DO NOTHING;\\"",
-                  "echo Orders DB done",
-
-                  "echo === DB Init complete ==="
-                ]' \
-                --query 'Command.CommandId' \
-                --output text
-            """,
-            returnStdout: true
-          ).trim()
-
-          sh """
-            sleep 20
-            STATUS=\$(aws ssm get-command-invocation \
-              --command-id ${commandId} \
-              --instance-id \$(echo ${instances} | awk '{print \$1}') \
-              --region ${region} \
-              --query 'Status' \
-              --output text)
-            echo "DB Init status: \$STATUS"
-            if [ "\$STATUS" != "Success" ]; then
-              echo "DB Init failed!"
-              aws ssm get-command-invocation \
-                --command-id ${commandId} \
-                --instance-id \$(echo ${instances} | awk '{print \$1}') \
-                --region ${region} \
-                --query 'StandardErrorContent' \
-                --output text
-              exit 1
-            fi
-            echo "✅ DB initialized!"
-          """
-        }
-      }
-    }
-  }
+              // Write SSM command as JSON file — avoids ALL escaping issues!
+              writeFile file: '/tmp/db-init.json', text: """
+{
+  "commands": [
+    "set -e",
+    "echo === DB Init start ===",
+    "USER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/user-service/db --region ${region} --query SecretString --output text)",
+    "USER_HOST=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"host\\\"])')",
+    "USER_USER=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"username\\\"])')",
+    "USER_PASS=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"password\\\"])')",
+    "USER_DB=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"dbname\\\"])')",
+    "ORDER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/order-service/db --region ${region} --query SecretString --output text)",
+    "ORDER_HOST=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"host\\\"])')",
+    "ORDER_USER=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"username\\\"])')",
+    "ORDER_PASS=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"password\\\"])')",
+    "ORDER_DB=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"dbname\\\"])')",
+    "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c 'CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, created_at TIMESTAMP DEFAULT NOW());'",
+    "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c \\"INSERT INTO users (name,email) VALUES ('Alice','alice@example.com'),('Bob','bob@example.com'),('Carol','carol@example.com'),('Dave','dave@example.com') ON CONFLICT DO NOTHING;\\"",
+    "echo Users DB done",
+    "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c 'CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(50) DEFAULT \\'pending\\', created_at TIMESTAMP DEFAULT NOW());'",
+    "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c \\"INSERT INTO orders (user_id,product,amount,status) VALUES (1,'Laptop',999.99,'completed'),(2,'Phone',599.99,'pending'),(3,'Tablet',399.99,'completed'),(4,'Headphones',149.99,'shipped') ON CONFLICT DO NOTHING;\\"",
+    "echo Orders DB done",
+    "echo === DB Init complete ==="
+  ]
 }
-stage('Deploy to EC2') {
-  when {
-    buildingTag()  // only deploy on git tags!
-  }
-  agent any
-  steps {
-    measureStage('Deploy_EC2') {
-      withCredentials([[
-        $class: 'AmazonWebServicesCredentialsBinding',
-        credentialsId: 'aws-ecr-credentials'
-      ]]) {
-        script {
-          def imageTag = env.TAG_NAME
-          def ecrRegistry = env.ECR_REGISTRY
-          def region = "ap-south-1"
-          def project = "micro-dash"
-          def userSecret = "${project}/dev/user-service/db"
-          def orderSecret = "${project}/dev/order-service/db"
+"""
 
-          // Get EC2 instance IDs
-          def instances = sh(
-            script: """
-              aws ec2 describe-instances \
-                --region ${region} \
-                --filters \
-                  "Name=tag:project,Values=${project}" \
-                  "Name=instance-state-name,Values=running" \
-                --query 'Reservations[*].Instances[*].InstanceId' \
-                --output text
-            """,
-            returnStdout: true
-          ).trim()
+              def commandId = sh(
+                script: """
+                  aws ssm send-command \
+                    --region ${region} \
+                    --instance-ids ${instances} \
+                    --document-name "AWS-RunShellScript" \
+                    --comment "Init DB" \
+                    --cli-input-json file:///tmp/db-init.json \
+                    --query 'Command.CommandId' \
+                    --output text
+                """,
+                returnStdout: true
+              ).trim()
 
-          if (!instances) {
-            error "No running EC2 instances found for project ${project}!"
+              echo "SSM Command ID: ${commandId}"
+
+              sh """
+                echo "Waiting for DB init..."
+                sleep 30
+
+                STATUS=\$(aws ssm get-command-invocation \
+                  --command-id ${commandId} \
+                  --instance-id \$(echo ${instances} | awk '{print \$1}') \
+                  --region ${region} \
+                  --query 'Status' \
+                  --output text)
+
+                echo "DB Init status: \$STATUS"
+
+                if [ "\$STATUS" != "Success" ]; then
+                  echo "DB Init failed! Error output:"
+                  aws ssm get-command-invocation \
+                    --command-id ${commandId} \
+                    --instance-id \$(echo ${instances} | awk '{print \$1}') \
+                    --region ${region} \
+                    --query 'StandardErrorContent' \
+                    --output text
+                  exit 1
+                fi
+                echo "✅ DB initialized!"
+              """
+            }
           }
-
-          echo "Deploying to instances: ${instances}"
-
-          // Send deploy command via SSM
-          def commandId = sh(
-            script: """
-              aws ssm send-command \
-                --region ${region} \
-                --instance-ids ${instances} \
-                --document-name "AWS-RunShellScript" \
-                --comment "Deploy ${imageTag}" \
-                --parameters 'commands=[
-                  "set -e",
-                  "echo === Deploy ${imageTag} start \$(date) ===",
-
-                  "# ECR Login",
-                  "aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecrRegistry}",
-
-                  "# Pull new images",
-                  "docker pull ${ecrRegistry}/frontend:${imageTag}",
-                  "docker pull ${ecrRegistry}/gateway:${imageTag}",
-                  "docker pull ${ecrRegistry}/user-service:${imageTag}",
-                  "docker pull ${ecrRegistry}/order-service:${imageTag}",
-
-                  "# Create networks",
-                  "docker network create frontend 2>/dev/null || true",
-                  "docker network create backend 2>/dev/null || true",
-
-                  "# Stop old containers",
-                  "docker stop frontend gateway user-service order-service 2>/dev/null || true",
-                  "docker rm frontend gateway user-service order-service 2>/dev/null || true",
-
-                  "# Run user-service",
-                  "docker run -d --name user-service --network backend --restart unless-stopped -p 3001:3001 -e DB_SECRET_NAME=${userSecret} -e AWS_REGION=${region} -e PORT=3001 ${ecrRegistry}/user-service:${imageTag}",
-
-                  "# Run order-service",
-                  "docker run -d --name order-service --network backend --restart unless-stopped -p 3002:3002 -e DB_SECRET_NAME=${orderSecret} -e AWS_REGION=${region} -e PORT=3002 ${ecrRegistry}/order-service:${imageTag}",
-
-                  "# Run gateway",
-                  "docker run -d --name gateway --network backend --restart unless-stopped -p 3000:3000 -e USER_SERVICE_URL=http://user-service:3001 -e ORDER_SERVICE_URL=http://order-service:3002 -e PORT=3000 ${ecrRegistry}/gateway:${imageTag}",
-                  "docker network connect frontend gateway",
-
-                  "# Run frontend",
-                  "docker run -d --name frontend --network frontend --restart unless-stopped -p 100:80 ${ecrRegistry}/frontend:${imageTag}",
-
-                  "# Health checks",
-                  "sleep 15",
-                  "curl -f http://localhost:3000/health && echo Gateway OK",
-                  "curl -f http://localhost:100 && echo Frontend OK",
-
-                  "echo === Deploy complete \$(date) ==="
-                ]' \
-                --query 'Command.CommandId' \
-                --output text
-            """,
-            returnStdout: true
-          ).trim()
-
-          echo "SSM Command ID: ${commandId}"
-
-          // Wait for command to complete
-          sh """
-            echo "Waiting for deployment to complete..."
-            sleep 30
-
-            STATUS=\$(aws ssm get-command-invocation \
-              --command-id ${commandId} \
-              --instance-id \$(echo ${instances} | awk '{print \$1}') \
-              --region ${region} \
-              --query 'Status' \
-              --output text)
-
-            echo "Deployment status: \$STATUS"
-
-            if [ "\$STATUS" != "Success" ]; then
-              echo "Deployment failed! Check SSM console for details."
-              aws ssm get-command-invocation \
-                --command-id ${commandId} \
-                --instance-id \$(echo ${instances} | awk '{print \$1}') \
-                --region ${region} \
-                --query 'StandardErrorContent' \
-                --output text
-              exit 1
-            fi
-
-            echo "✅ Deployment successful!"
-          """
         }
       }
     }
-  }
+
+    // ─────────────────────────────────────────────
+    // STAGE 15: Deploy to EC2
+    // ─────────────────────────────────────────────
+    stage('Deploy to EC2') {
+      when { buildingTag() }
+      agent any
+      steps {
+        measureStage('Deploy_EC2') {
+          withCredentials([[
+            $class: 'AmazonWebServicesCredentialsBinding',
+            credentialsId: 'aws-ecr-credentials'
+          ]]) {
+            script {
+              def imageTag = env.TAG_NAME
+              def ecrRegistry = env.ECR_REGISTRY
+              def region = "ap-south-1"
+              def project = "micro-dash"
+              def userSecret = "${project}/dev/user-service/db"
+              def orderSecret = "${project}/dev/order-service/db"
+
+              def instances = sh(
+                script: """
+                  aws ec2 describe-instances \
+                    --region ${region} \
+                    --filters \
+                      "Name=tag:project,Values=${project}" \
+                      "Name=instance-state-name,Values=running" \
+                    --query 'Reservations[*].Instances[*].InstanceId' \
+                    --output text
+                """,
+                returnStdout: true
+              ).trim()
+
+              if (!instances) {
+                error "No running EC2 instances found!"
+              }
+
+              echo "Deploying ${imageTag} to instances: ${instances}"
+
+              // Write deploy command as JSON file
+              writeFile file: '/tmp/deploy.json', text: """
+{
+  "commands": [
+    "set -e",
+    "echo === Deploy ${imageTag} start ===",
+    "aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecrRegistry}",
+    "docker pull ${ecrRegistry}/frontend:${imageTag}",
+    "docker pull ${ecrRegistry}/gateway:${imageTag}",
+    "docker pull ${ecrRegistry}/user-service:${imageTag}",
+    "docker pull ${ecrRegistry}/order-service:${imageTag}",
+    "docker network create frontend 2>/dev/null || true",
+    "docker network create backend 2>/dev/null || true",
+    "docker stop frontend gateway user-service order-service 2>/dev/null || true",
+    "docker rm frontend gateway user-service order-service 2>/dev/null || true",
+    "docker run -d --name user-service --network backend --restart unless-stopped -p 3001:3001 -e DB_SECRET_NAME=${userSecret} -e AWS_REGION=${region} -e PORT=3001 ${ecrRegistry}/user-service:${imageTag}",
+    "docker run -d --name order-service --network backend --restart unless-stopped -p 3002:3002 -e DB_SECRET_NAME=${orderSecret} -e AWS_REGION=${region} -e PORT=3002 ${ecrRegistry}/order-service:${imageTag}",
+    "docker run -d --name gateway --network backend --restart unless-stopped -p 3000:3000 -e USER_SERVICE_URL=http://user-service:3001 -e ORDER_SERVICE_URL=http://order-service:3002 -e PORT=3000 ${ecrRegistry}/gateway:${imageTag}",
+    "docker network connect frontend gateway",
+    "docker run -d --name frontend --network frontend --restart unless-stopped -p 100:80 ${ecrRegistry}/frontend:${imageTag}",
+    "sleep 15",
+    "curl -f http://localhost:3000/health && echo Gateway OK",
+    "curl -f http://localhost:100 && echo Frontend OK",
+    "echo === Deploy complete ==="
+  ]
 }
+"""
+
+              def commandId = sh(
+                script: """
+                  aws ssm send-command \
+                    --region ${region} \
+                    --instance-ids ${instances} \
+                    --document-name "AWS-RunShellScript" \
+                    --comment "Deploy ${imageTag}" \
+                    --cli-input-json file:///tmp/deploy.json \
+                    --query 'Command.CommandId' \
+                    --output text
+                """,
+                returnStdout: true
+              ).trim()
+
+              echo "SSM Command ID: ${commandId}"
+
+              sh """
+                echo "Waiting for deployment..."
+                sleep 60
+
+                STATUS=\$(aws ssm get-command-invocation \
+                  --command-id ${commandId} \
+                  --instance-id \$(echo ${instances} | awk '{print \$1}') \
+                  --region ${region} \
+                  --query 'Status' \
+                  --output text)
+
+                echo "Deploy status: \$STATUS"
+
+                if [ "\$STATUS" != "Success" ]; then
+                  echo "Deploy failed! Error:"
+                  aws ssm get-command-invocation \
+                    --command-id ${commandId} \
+                    --instance-id \$(echo ${instances} | awk '{print \$1}') \
+                    --region ${region} \
+                    --query 'StandardErrorContent' \
+                    --output text
+                  exit 1
+                fi
+
+                echo "✅ Deployment successful!"
+              """
+            }
+          }
+        }
+      }
+    }
 
     // ─────────────────────────────────────────────
     // STAGE 14: Cleanup
