@@ -558,10 +558,8 @@ pipeline {
 
       }
     }
- stage('Init Database') {
-  when {
-    buildingTag()
-  }
+stage('Init Database') {
+  when { buildingTag() }
   agent any
   steps {
     measureStage('Init_Database') {
@@ -572,6 +570,7 @@ pipeline {
         script {
           def region = "ap-south-1"
           def project = "micro-dash"
+
           def instances = sh(
             script: """
               aws ec2 describe-instances \
@@ -585,12 +584,6 @@ pipeline {
             returnStdout: true
           ).trim()
 
-          // read init.sql files from workspace
-          def userInitSql = readFile('user-service/init.sql')
-            .replace("'", "'\\''")  // escape single quotes
-          def orderInitSql = readFile('order-service/init.sql')
-            .replace("'", "'\\''")
-
           def commandId = sh(
             script: """
               aws ssm send-command \
@@ -602,32 +595,25 @@ pipeline {
                   "set -e",
                   "echo === DB Init start ===",
 
-                  "# Get user-db credentials",
                   "USER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/user-service/db --region ${region} --query SecretString --output text)",
-                  "USER_HOST=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27host\\x27])\\")",
-                  "USER_USER=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27username\\x27])\\")",
-                  "USER_PASS=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27password\\x27])\\")",
-                  "USER_DB=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27dbname\\x27])\\")",
+                  "USER_HOST=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'host\\'])\\")",
+                  "USER_USER=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'username\\'])\\")",
+                  "USER_PASS=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'password\\'])\\")",
+                  "USER_DB=\$(echo \$USER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'dbname\\'])\\")",
 
-                  "# Get order-db credentials",
                   "ORDER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/order-service/db --region ${region} --query SecretString --output text)",
-                  "ORDER_HOST=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27host\\x27])\\")",
-                  "ORDER_USER=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27username\\x27])\\")",
-                  "ORDER_PASS=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27password\\x27])\\")",
-                  "ORDER_DB=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\x27dbname\\x27])\\")",
+                  "ORDER_HOST=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'host\\'])\\")",
+                  "ORDER_USER=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'username\\'])\\")",
+                  "ORDER_PASS=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'password\\'])\\")",
+                  "ORDER_DB=\$(echo \$ORDER_SECRET | python3 -c \\"import sys,json; print(json.load(sys.stdin)[\\'dbname\\'])\\")",
 
-                  "# Write init.sql files",
-                  "cat > /tmp/user-init.sql << \\'SQLEOF\\'",
-                  "${userInitSql}",
-                  "SQLEOF",
+                  "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c \\"CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, created_at TIMESTAMP DEFAULT NOW());\\"",
+                  "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c \\"INSERT INTO users (name,email) VALUES (\\'Alice\\',\\'alice@example.com\\'),(\\'Bob\\',\\'bob@example.com\\'),(\\'Carol\\',\\'carol@example.com\\'),(\\'Dave\\',\\'dave@example.com\\') ON CONFLICT DO NOTHING;\\"",
+                  "echo Users DB done",
 
-                  "cat > /tmp/order-init.sql << \\'SQLEOF\\'",
-                  "${orderInitSql}",
-                  "SQLEOF",
-
-                  "# Run init.sql",
-                  "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -f /tmp/user-init.sql && echo ✅ Users DB initialized",
-                  "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -f /tmp/order-init.sql && echo ✅ Orders DB initialized",
+                  "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c \\"CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(50) DEFAULT \\'pending\\', created_at TIMESTAMP DEFAULT NOW());\\"",
+                  "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c \\"INSERT INTO orders (user_id,product,amount,status) VALUES (1,\\'Laptop\\',999.99,\\'completed\\'),(2,\\'Phone\\',599.99,\\'pending\\'),(3,\\'Tablet\\',399.99,\\'completed\\'),(4,\\'Headphones\\',149.99,\\'shipped\\') ON CONFLICT DO NOTHING;\\"",
+                  "echo Orders DB done",
 
                   "echo === DB Init complete ==="
                 ]' \
@@ -637,7 +623,6 @@ pipeline {
             returnStdout: true
           ).trim()
 
-          // wait for DB init
           sh """
             sleep 20
             STATUS=\$(aws ssm get-command-invocation \
@@ -649,6 +634,12 @@ pipeline {
             echo "DB Init status: \$STATUS"
             if [ "\$STATUS" != "Success" ]; then
               echo "DB Init failed!"
+              aws ssm get-command-invocation \
+                --command-id ${commandId} \
+                --instance-id \$(echo ${instances} | awk '{print \$1}') \
+                --region ${region} \
+                --query 'StandardErrorContent' \
+                --output text
               exit 1
             fi
             echo "✅ DB initialized!"
