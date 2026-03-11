@@ -19,7 +19,7 @@ app.get('/api/dashboard', async (req, res) => {
     });
   } catch (err) {
     /* eslint-disable no-console */
-    console.error('Servicwe communication failed:', err.message); // ← Log it (now used)
+    console.error('Service communication failed:', err.message); // ← Log it (now used)
 
     res.status(500).json({ error: 'Service communication failed' });
   }

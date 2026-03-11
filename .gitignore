@@ -7,3 +7,9 @@ new
 today-target
 CI-ARCH
 image.png
+cost.txt
+secrets/
+**/coverage/
+**/junit.xml
+**/node_modules/
+dummy.txt

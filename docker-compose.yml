@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   frontend:
     build: ./frontend
@@ -8,9 +6,7 @@ services:
     depends_on:
       - gateway
     networks:
-     - frontend
-    volumes:
-     - ./frontend:/usr/share/nginx/html
+      - frontend
     restart: unless-stopped
 
   gateway:
@@ -18,30 +14,105 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - USER_SERVICE_URL=${USER_SERVICE_URL}
-      - ORDER_SERVICE_URL=${ORDER_SERVICE_URL}
+      - USER_SERVICE_URL=http://user-service:3001
+      - ORDER_SERVICE_URL=http://order-service:3002
     depends_on:
       - user-service
       - order-service
     networks:
-     - frontend
-     - backend
+      - frontend
+      - backend
     restart: on-failure:5
 
   user-service:
     build: ./user-service
+    environment:
+      - DB_HOST=user-db
+      - DB_PORT=5432
+      - DB_NAME=usersdb
+      - DB_USER=appuser
+    secrets:
+      - source: db_password
+        target: db_password
+        uid: '65532'
+        gid: '65532'
+        mode: 0440
+    depends_on:
+      user-db:
+        condition: service_healthy
     networks:
-     - backend
+      - backend
     restart: unless-stopped
-
 
   order-service:
     build: ./order-service
+    environment:
+      - DB_HOST=order-db
+      - DB_PORT=5432
+      - DB_NAME=ordersdb
+      - DB_USER=appuser
+    secrets:
+      - source: db_password
+        target: db_password
+        uid: '65532'
+        gid: '65532'
+        mode: 0440
+    depends_on:
+      order-db:
+        condition: service_healthy
     networks:
-     - backend
+      - backend
     restart: unless-stopped
 
+  user-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=usersdb
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+      - ./user-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d usersdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
+  order-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=ordersdb
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - order-db-data:/var/lib/postgresql/data
+      - ./order-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d ordersdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  user-db-data:
+  order-db-data:
 
 networks:
   frontend:

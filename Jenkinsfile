@@ -4,7 +4,7 @@ pipeline {
   agent none
 
   environment {
-    HARBOR_REGISTRY = "34.180.10.118"
+    HARBOR_REGISTRY = "34.133.110.141"
     HARBOR_PROJECT  = "micro-dash"
     ECR_REGISTRY    = "760302898980.dkr.ecr.ap-south-1.amazonaws.com"
   }
