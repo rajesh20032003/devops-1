@@ -360,7 +360,7 @@ pipeline {
       parallel {
 
         stage('Frontend') {
-          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**';  branch 'main' } }
           agent any
           steps {
             measureStage('SBOM_frontend') {
@@ -370,7 +370,7 @@ pipeline {
         }
 
         stage('Gateway') {
-          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**';  branch 'main' } }
           agent any
           steps {
             measureStage('SBOM_gateway') {
@@ -380,7 +380,7 @@ pipeline {
         }
 
         stage('User Service') {
-          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**';  branch 'main' } }
           agent any
           steps {
             measureStage('SBOM_user_service') {
@@ -390,7 +390,7 @@ pipeline {
         }
 
         stage('Order Service') {
-          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**';  branch 'main' } }
           agent any
           steps {
             measureStage('SBOM_order_service') {
@@ -575,18 +575,18 @@ pipeline {
               def project = "micro-dash"
 
               def instances = sh(
-                script: """
-                  aws ec2 describe-instances \
-                    --region ${region} \
-                    --filters \
-                      "Name=tag:Role,Values=app-server" \
-                      "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
-                      "Name=instance-state-name,Values=running" \
-                    --query 'Reservations[*].Instances[*].InstanceId' \
-                    --output text
-                """,
-                returnStdout: true
-              ).trim()
+                  script: """
+                    aws ec2 describe-instances \
+                      --region ${region} \
+                      --filters \
+                        "Name=tag:Role,Values=app-server" \
+                        "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
+                        "Name=instance-state-name,Values=running" \
+                      --query 'Reservations[].Instances[].InstanceId' \
+                      --output json | jq -r 'join(" ")'
+                  """,
+                  returnStdout: true
+                ).trim()
 
               if (!instances) { error "No running EC2 instances found!" }
 
@@ -610,7 +610,7 @@ pipeline {
 
               sh """
                 echo "Waiting for DB init..."
-                sleep 40
+                sleep 15
 
                 STATUS=\$(aws ssm get-command-invocation \
                   --command-id ${commandId} \
