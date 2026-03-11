@@ -558,7 +558,7 @@ pipeline {
 
       }
     }
-  stage('Init Database') {
+ stage('Init Database') {
   when {
     buildingTag()
   }
@@ -658,7 +658,7 @@ pipeline {
     }
   }
 }
-    stage('Deploy to EC2') {
+stage('Deploy to EC2') {
   when {
     buildingTag()  // only deploy on git tags!
   }
