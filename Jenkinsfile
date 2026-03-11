@@ -664,8 +664,8 @@ pipeline {
                           "Name=tag:Role,Values=app-server" \
                           "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
                           "Name=instance-state-name,Values=running" \
-                        --query 'Reservations[*].Instances[*].InstanceId' \
-                        --output text | tr '\\t' ' '
+                        --query 'Reservations[].Instances[].InstanceId' \
+                        --output json | python3 -c "import sys,json; print(' '.join(json.load(sys.stdin)))"
                     """,
                     returnStdout: true
                   ).trim()
