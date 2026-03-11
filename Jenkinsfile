@@ -103,7 +103,7 @@ pipeline {
         stage('Gateway') {
           when {
             beforeAgent true
-            anyOf { changeset "**/gateway/**"; branch 'main'; buildingTag() }
+            anyOf { changeset "**/gateway/**"; branch 'main' }
           }
           // no agent block — nodeQualityCheck creates K8s pod internally
           steps {
@@ -116,7 +116,7 @@ pipeline {
         stage('User Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/user-service/**"; buildingTag(); branch 'main' }
+            anyOf { changeset "**/user-service/**";  branch 'main' }
           }
           steps {
             Nodequalitycheck('user-service')
@@ -126,7 +126,7 @@ pipeline {
         stage('Order Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/order-service/**"; buildingTag(); branch 'main' }
+            anyOf { changeset "**/order-service/**"; branch 'main' }
           }
           steps {
             // passes extraSteps closure to clear jest cache before running
@@ -140,7 +140,7 @@ pipeline {
         stage('Frontend') {
           when {
             beforeAgent true
-            anyOf { changeset "**/frontend/**"; branch 'main'; buildingTag() }
+            anyOf { changeset "**/frontend/**"; branch 'main' }
           }
           steps {
             // lintOnly = true:
@@ -163,8 +163,8 @@ pipeline {
         beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
-          changeset "user-service/**"; changeset "frontend/**"
-          buildingTag(); branch 'main'
+          changeset "user-service/**"; changeset "frontend/**";
+         branch 'main'
         }
       }
       agent any
@@ -219,7 +219,7 @@ pipeline {
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
-          buildingTag(); branch 'main'
+          //buildingTag(); branch 'main'
         }
       }
       agent any
@@ -411,7 +411,7 @@ pipeline {
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
-          buildingTag()
+          // buildingTag()
         }
       }
       agent any
@@ -572,17 +572,18 @@ stage('Init Database') {
               def project = "micro-dash"
 
               def instances = sh(
-                script: """
-                  aws ec2 describe-instances \
-                    --region ${region} \
-                    --filters \
-                      "Name=tag:project,Values=${project}" \
-                      "Name=instance-state-name,Values=running" \
-                    --query 'Reservations[*].Instances[*].InstanceId' \
-                    --output text
-                """,
-                returnStdout: true
-              ).trim()
+                  script: """
+                    aws ec2 describe-instances \
+                      --region ${region} \
+                      --filters \
+                        "Name=tag:Role,Values=app-server" \
+                        "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
+                        "Name=instance-state-name,Values=running" \
+                      --query 'Reservations[*].Instances[*].InstanceId' \
+                      --output text
+                  """,
+                  returnStdout: true
+                ).trim()
 
               if (!instances) {
                 error "No running EC2 instances found!"
@@ -684,18 +685,19 @@ stage('Init Database') {
               def userSecret = "${project}/dev/user-service/db"
               def orderSecret = "${project}/dev/order-service/db"
 
-              def instances = sh(
-                script: """
-                  aws ec2 describe-instances \
-                    --region ${region} \
-                    --filters \
-                      "Name=tag:project,Values=${project}" \
-                      "Name=instance-state-name,Values=running" \
-                    --query 'Reservations[*].Instances[*].InstanceId' \
-                    --output text
-                """,
-                returnStdout: true
-              ).trim()
+             def instances = sh(
+                  script: """
+                    aws ec2 describe-instances \
+                      --region ${region} \
+                      --filters \
+                        "Name=tag:Role,Values=app-server" \
+                        "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
+                        "Name=instance-state-name,Values=running" \
+                      --query 'Reservations[*].Instances[*].InstanceId' \
+                      --output text
+                  """,
+                  returnStdout: true
+                ).trim()
 
               if (!instances) {
                 error "No running EC2 instances found!"
