@@ -558,7 +558,10 @@ pipeline {
 
       }
     }
-stage('Init Database') {
+// ─────────────────────────────────────────────
+    // STAGE 14: Init Database
+    // ─────────────────────────────────────────────
+    stage('Init Database') {
       when { buildingTag() }
       agent any
       steps {
@@ -585,53 +588,18 @@ stage('Init Database') {
                 returnStdout: true
               ).trim()
 
-              if (!instances) {
-                error "No running EC2 instances found!"
-              }
+              if (!instances) { error "No running EC2 instances found!" }
 
-              echo "Initializing DB on instances: ${instances}"
-
-              // convert space-separated IDs to JSON array
-              def instanceList = instances.split('\\s+')
-                .collect { "\"${it}\"" }
-                .join(', ')
-
-              writeFile file: '/tmp/db-init.json', text: """
-{
-  "DocumentName": "AWS-RunShellScript",
-  "InstanceIds": [${instanceList}],
-  "Comment": "Init DB",
-  "Parameters": {
-    "commands": [
-      "set -e",
-      "echo === DB Init start ===",
-      "USER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/user-service/db --region ${region} --query SecretString --output text)",
-      "USER_HOST=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"host\\\"])')",
-      "USER_USER=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"username\\\"])')",
-      "USER_PASS=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"password\\\"])')",
-      "USER_DB=\$(echo \$USER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"dbname\\\"])')",
-      "ORDER_SECRET=\$(aws secretsmanager get-secret-value --secret-id ${project}/dev/order-service/db --region ${region} --query SecretString --output text)",
-      "ORDER_HOST=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"host\\\"])')",
-      "ORDER_USER=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"username\\\"])')",
-      "ORDER_PASS=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"password\\\"])')",
-      "ORDER_DB=\$(echo \$ORDER_SECRET | python3 -c 'import sys,json; print(json.load(sys.stdin)[\\\"dbname\\\"])')",
-      "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c 'CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(100), email VARCHAR(100) UNIQUE, created_at TIMESTAMP DEFAULT NOW());'",
-      "PGPASSWORD=\$USER_PASS psql -h \$USER_HOST -U \$USER_USER -d \$USER_DB -c \\"INSERT INTO users (name,email) VALUES ('Alice','alice@example.com'),('Bob','bob@example.com'),('Carol','carol@example.com'),('Dave','dave@example.com') ON CONFLICT DO NOTHING;\\"",
-      "echo Users DB done",
-      "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c 'CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, user_id INTEGER, product VARCHAR(100), amount DECIMAL(10,2), status VARCHAR(50) DEFAULT \\'pending\\', created_at TIMESTAMP DEFAULT NOW());'",
-      "PGPASSWORD=\$ORDER_PASS psql -h \$ORDER_HOST -U \$ORDER_USER -d \$ORDER_DB -c \\"INSERT INTO orders (user_id,product,amount,status) VALUES (1,'Laptop',999.99,'completed'),(2,'Phone',599.99,'pending'),(3,'Tablet',399.99,'completed'),(4,'Headphones',149.99,'shipped') ON CONFLICT DO NOTHING;\\"",
-      "echo Orders DB done",
-      "echo === DB Init complete ==="
-    ]
-  }
-}
-"""
+              def firstInstance = instances.split('\\s+')[0]
+              echo "Initializing DB on: ${firstInstance}"
 
               def commandId = sh(
                 script: """
                   aws ssm send-command \
                     --region ${region} \
-                    --cli-input-json file:///tmp/db-init.json \
+                    --instance-ids ${firstInstance} \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters 'commands=["aws ssm get-parameter --name /micro-dash/scripts/db-init --region ${region} --query Parameter.Value --output text > /tmp/db-init.sh && chmod +x /tmp/db-init.sh && bash /tmp/db-init.sh"]' \
                     --query 'Command.CommandId' \
                     --output text
                 """,
@@ -640,12 +608,9 @@ stage('Init Database') {
 
               echo "SSM Command ID: ${commandId}"
 
-              // use first instance for status check
-              def firstInstance = instances.split('\\s+')[0]
-
               sh """
                 echo "Waiting for DB init..."
-                sleep 30
+                sleep 40
 
                 STATUS=\$(aws ssm get-command-invocation \
                   --command-id ${commandId} \
@@ -657,7 +622,7 @@ stage('Init Database') {
                 echo "DB Init status: \$STATUS"
 
                 if [ "\$STATUS" != "Success" ]; then
-                  echo "DB Init failed! Error output:"
+                  echo "DB Init failed! Error:"
                   aws ssm get-command-invocation \
                     --command-id ${commandId} \
                     --instance-id ${firstInstance} \
@@ -688,11 +653,8 @@ stage('Init Database') {
           ]]) {
             script {
               def imageTag = env.TAG_NAME
-              def ecrRegistry = env.ECR_REGISTRY
               def region = "ap-south-1"
               def project = "micro-dash"
-              def userSecret = "${project}/dev/user-service/db"
-              def orderSecret = "${project}/dev/order-service/db"
 
               def instances = sh(
                 script: """
@@ -708,57 +670,17 @@ stage('Init Database') {
                 returnStdout: true
               ).trim()
 
-              if (!instances) {
-                error "No running EC2 instances found!"
-              }
+              if (!instances) { error "No running EC2 instances found!" }
 
-              echo "Deploying ${imageTag} to instances: ${instances}"
-
-              // convert space-separated IDs to JSON array
-              def instanceList = instances.split('\\s+')
-                .collect { "\"${it}\"" }
-                .join(', ')
-
-              // use first instance for status check
-              def firstInstance = instances.split('\\s+')[0]
-
-              writeFile file: '/tmp/deploy.json', text: """
-{
-  "DocumentName": "AWS-RunShellScript",
-  "InstanceIds": [${instanceList}],
-  "Comment": "Deploy ${imageTag}",
-  "Parameters": {
-    "commands": [
-      "set -e",
-      "echo === Deploy ${imageTag} start ===",
-      "aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${ecrRegistry}",
-      "docker pull ${ecrRegistry}/frontend:${imageTag}",
-      "docker pull ${ecrRegistry}/gateway:${imageTag}",
-      "docker pull ${ecrRegistry}/user-service:${imageTag}",
-      "docker pull ${ecrRegistry}/order-service:${imageTag}",
-      "docker network create frontend 2>/dev/null || true",
-      "docker network create backend 2>/dev/null || true",
-      "docker stop frontend gateway user-service order-service 2>/dev/null || true",
-      "docker rm frontend gateway user-service order-service 2>/dev/null || true",
-      "docker run -d --name user-service --network backend --restart unless-stopped -p 3001:3001 -e DB_SECRET_NAME=${userSecret} -e AWS_REGION=${region} -e PORT=3001 ${ecrRegistry}/user-service:${imageTag}",
-      "docker run -d --name order-service --network backend --restart unless-stopped -p 3002:3002 -e DB_SECRET_NAME=${orderSecret} -e AWS_REGION=${region} -e PORT=3002 ${ecrRegistry}/order-service:${imageTag}",
-      "docker run -d --name gateway --network backend --restart unless-stopped -p 3000:3000 -e USER_SERVICE_URL=http://user-service:3001 -e ORDER_SERVICE_URL=http://order-service:3002 -e PORT=3000 ${ecrRegistry}/gateway:${imageTag}",
-      "docker network connect frontend gateway",
-      "docker run -d --name frontend --network frontend --restart unless-stopped -p 100:80 ${ecrRegistry}/frontend:${imageTag}",
-      "sleep 15",
-      "curl -f http://localhost:3000/health && echo Gateway OK",
-      "curl -f http://localhost:100 && echo Frontend OK",
-      "echo === Deploy complete ==="
-    ]
-  }
-}
-"""
+              echo "Deploying ${imageTag} to: ${instances}"
 
               def commandId = sh(
                 script: """
                   aws ssm send-command \
                     --region ${region} \
-                    --cli-input-json file:///tmp/deploy.json \
+                    --instance-ids ${instances} \
+                    --document-name "AWS-RunShellScript" \
+                    --parameters 'commands=["aws ssm get-parameter --name /micro-dash/scripts/deploy --region ${region} --query Parameter.Value --output text > /tmp/deploy.sh && chmod +x /tmp/deploy.sh && bash /tmp/deploy.sh ${imageTag}"]' \
                     --query 'Command.CommandId' \
                     --output text
                 """,
@@ -766,6 +688,8 @@ stage('Init Database') {
               ).trim()
 
               echo "SSM Command ID: ${commandId}"
+
+              def firstInstance = instances.split('\\s+')[0]
 
               sh """
                 echo "Waiting for deployment..."
@@ -790,7 +714,6 @@ stage('Init Database') {
                     --output text
                   exit 1
                 fi
-
                 echo "✅ Deployment successful!"
               """
             }
