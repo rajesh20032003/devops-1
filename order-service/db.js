@@ -84,7 +84,7 @@ async function getPool() {
     // SSL required for RDS in production
     // not needed locally
     ssl: process.env.DB_SECRET_NAME
-      ? { rejectUnauthorized: true }
+      ? { rejectUnauthorized: false }
       : false,
   });
 
