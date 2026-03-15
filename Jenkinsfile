@@ -561,166 +561,166 @@ pipeline {
 // ─────────────────────────────────────────────
     // STAGE 14: Init Database
     // ─────────────────────────────────────────────
-    stage('Init Database') {
-      when { buildingTag() }
-      agent any
-      steps {
-        measureStage('Init_Database') {
-          withCredentials([[
-            $class: 'AmazonWebServicesCredentialsBinding',
-            credentialsId: 'aws-ecr-credentials'
-          ]]) {
-            script {
-              def region = "ap-south-1"
-              def project = "micro-dash"
+    // stage('Init Database') {
+    //   when { buildingTag() }
+    //   agent any
+    //   steps {
+    //     measureStage('Init_Database') {
+    //       withCredentials([[
+    //         $class: 'AmazonWebServicesCredentialsBinding',
+    //         credentialsId: 'aws-ecr-credentials'
+    //       ]]) {
+    //         script {
+    //           def region = "ap-south-1"
+    //           def project = "micro-dash"
 
-              def instances = sh(
-                script: """
-                  aws ec2 describe-instances \
-                    --region ${region} \
-                    --filters \
-                      "Name=tag:Role,Values=app-server" \
-                      "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
-                      "Name=instance-state-name,Values=running" \
-                    --query 'Reservations[*].Instances[*].InstanceId' \
-                    --output text
-                """,
-                returnStdout: true
-              ).trim()
+    //           def instances = sh(
+    //             script: """
+    //               aws ec2 describe-instances \
+    //                 --region ${region} \
+    //                 --filters \
+    //                   "Name=tag:Role,Values=app-server" \
+    //                   "Name=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
+    //                   "Name=instance-state-name,Values=running" \
+    //                 --query 'Reservations[*].Instances[*].InstanceId' \
+    //                 --output text
+    //             """,
+    //             returnStdout: true
+    //           ).trim()
 
-              if (!instances) { error "No running EC2 instances found!" }
+    //           if (!instances) { error "No running EC2 instances found!" }
 
-              def firstInstance = instances.split('\\s+')[0]
-              echo "Initializing DB on: ${firstInstance}"
+    //           def firstInstance = instances.split('\\s+')[0]
+    //           echo "Initializing DB on: ${firstInstance}"
 
-              def commandId = sh(
-                script: """
-                  aws ssm send-command \
-                    --region ${region} \
-                    --instance-ids ${firstInstance} \
-                    --document-name "AWS-RunShellScript" \
-                    --parameters 'commands=["aws ssm get-parameter --name /micro-dash/scripts/db-init --region ${region} --query Parameter.Value --output text > /tmp/db-init.sh && chmod +x /tmp/db-init.sh && bash /tmp/db-init.sh"]' \
-                    --query 'Command.CommandId' \
-                    --output text
-                """,
-                returnStdout: true
-              ).trim()
+    //           def commandId = sh(
+    //             script: """
+    //               aws ssm send-command \
+    //                 --region ${region} \
+    //                 --instance-ids ${firstInstance} \
+    //                 --document-name "AWS-RunShellScript" \
+    //                 --parameters 'commands=["aws ssm get-parameter --name /micro-dash/scripts/db-init --region ${region} --query Parameter.Value --output text > /tmp/db-init.sh && chmod +x /tmp/db-init.sh && bash /tmp/db-init.sh"]' \
+    //                 --query 'Command.CommandId' \
+    //                 --output text
+    //             """,
+    //             returnStdout: true
+    //           ).trim()
 
-              echo "SSM Command ID: ${commandId}"
+    //           echo "SSM Command ID: ${commandId}"
 
-              sh """
-                echo "Waiting for DB init..."
-                sleep 15
+    //           sh """
+    //             echo "Waiting for DB init..."
+    //             sleep 15
 
-                STATUS=\$(aws ssm get-command-invocation \
-                  --command-id ${commandId} \
-                  --instance-id ${firstInstance} \
-                  --region ${region} \
-                  --query 'Status' \
-                  --output text)
+    //             STATUS=\$(aws ssm get-command-invocation \
+    //               --command-id ${commandId} \
+    //               --instance-id ${firstInstance} \
+    //               --region ${region} \
+    //               --query 'Status' \
+    //               --output text)
 
-                echo "DB Init status: \$STATUS"
+    //             echo "DB Init status: \$STATUS"
 
-                if [ "\$STATUS" != "Success" ]; then
-                  echo "DB Init failed! Error:"
-                  aws ssm get-command-invocation \
-                    --command-id ${commandId} \
-                    --instance-id ${firstInstance} \
-                    --region ${region} \
-                    --query 'StandardErrorContent' \
-                    --output text
-                  exit 1
-                fi
-                echo "✅ DB initialized!"
-              """
-            }
-          }
-        }
-      }
-    }
+    //             if [ "\$STATUS" != "Success" ]; then
+    //               echo "DB Init failed! Error:"
+    //               aws ssm get-command-invocation \
+    //                 --command-id ${commandId} \
+    //                 --instance-id ${firstInstance} \
+    //                 --region ${region} \
+    //                 --query 'StandardErrorContent' \
+    //                 --output text
+    //               exit 1
+    //             fi
+    //             echo "✅ DB initialized!"
+    //           """
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
     // ─────────────────────────────────────────────
     // STAGE 15: Deploy to EC2
     // ─────────────────────────────────────────────
-    stage('Deploy to EC2') {
-        when { buildingTag() }
-        agent any
-        steps {
-          measureStage('Deploy_EC2') {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: 'aws-ecr-credentials'
-            ]]) {
-              script {
-                def imageTag = env.TAG_NAME
-                def region = "ap-south-1"
-                def project = "micro-dash"
+    // stage('Deploy to EC2') {
+    //     when { buildingTag() }
+    //     agent any
+    //     steps {
+    //       measureStage('Deploy_EC2') {
+    //         withCredentials([[
+    //           $class: 'AmazonWebServicesCredentialsBinding',
+    //           credentialsId: 'aws-ecr-credentials'
+    //         ]]) {
+    //           script {
+    //             def imageTag = env.TAG_NAME
+    //             def region = "ap-south-1"
+    //             def project = "micro-dash"
 
-                // get first instance from ASG for status check
-                def firstInstance = sh(
-                  script: """
-                    aws autoscaling describe-auto-scaling-groups \
-                      --auto-scaling-group-names ${project}-dev-asg \
-                      --region ${region} \
-                      --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
-                      --output text
-                  """,
-                  returnStdout: true
-                ).trim()
+    //             // get first instance from ASG for status check
+    //             def firstInstance = sh(
+    //               script: """
+    //                 aws autoscaling describe-auto-scaling-groups \
+    //                   --auto-scaling-group-names ${project}-dev-asg \
+    //                   --region ${region} \
+    //                   --query 'AutoScalingGroups[0].Instances[0].InstanceId' \
+    //                   --output text
+    //               """,
+    //               returnStdout: true
+    //             ).trim()
 
-                if (!firstInstance || firstInstance == 'None') {
-                  error "No running EC2 instances found in ASG!"
-                }
+    //             if (!firstInstance || firstInstance == 'None') {
+    //               error "No running EC2 instances found in ASG!"
+    //             }
 
-                echo "Deploying ${imageTag} to ASG: ${project}-dev-asg"
-                echo "Status check instance: ${firstInstance}"
+    //             echo "Deploying ${imageTag} to ASG: ${project}-dev-asg"
+    //             echo "Status check instance: ${firstInstance}"
 
-                // use --targets to deploy to ALL ASG instances
-                def commandId = sh(
-                  script: """
-                    aws ssm send-command \
-                      --region ${region} \
-                      --targets "Key=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
-                      --document-name "AWS-RunShellScript" \
-                      --parameters 'commands=["aws ssm get-parameter --name /micro-dash/scripts/deploy --region ${region} --query Parameter.Value --output text > /tmp/deploy.sh && chmod +x /tmp/deploy.sh && bash /tmp/deploy.sh ${imageTag}"]' \
-                      --query 'Command.CommandId' \
-                      --output text
-                  """,
-                  returnStdout: true
-                ).trim()
+    //             // use --targets to deploy to ALL ASG instances
+    //             def commandId = sh(
+    //               script: """
+    //                 aws ssm send-command \
+    //                   --region ${region} \
+    //                   --targets "Key=tag:aws:autoscaling:groupName,Values=${project}-dev-asg" \
+    //                   --document-name "AWS-RunShellScript" \
+    //                   --parameters 'commands=["aws ssm get-parameter --name /micro-dash/scripts/deploy --region ${region} --query Parameter.Value --output text > /tmp/deploy.sh && chmod +x /tmp/deploy.sh && bash /tmp/deploy.sh ${imageTag}"]' \
+    //                   --query 'Command.CommandId' \
+    //                   --output text
+    //               """,
+    //               returnStdout: true
+    //             ).trim()
 
-                echo "SSM Command ID: ${commandId}"
+    //             echo "SSM Command ID: ${commandId}"
 
-                sh """
-                  echo "Waiting for deployment..."
-                  sleep 60
+    //             sh """
+    //               echo "Waiting for deployment..."
+    //               sleep 60
 
-                  STATUS=\$(aws ssm get-command-invocation \
-                    --command-id ${commandId} \
-                    --instance-id ${firstInstance} \
-                    --region ${region} \
-                    --query 'Status' \
-                    --output text)
+    //               STATUS=\$(aws ssm get-command-invocation \
+    //                 --command-id ${commandId} \
+    //                 --instance-id ${firstInstance} \
+    //                 --region ${region} \
+    //                 --query 'Status' \
+    //                 --output text)
 
-                  echo "Deploy status: \$STATUS"
+    //               echo "Deploy status: \$STATUS"
 
-                  if [ "\$STATUS" != "Success" ]; then
-                    echo "Deploy failed! Error:"
-                    aws ssm get-command-invocation \
-                      --command-id ${commandId} \
-                      --instance-id ${firstInstance} \
-                      --region ${region} \
-                      --query 'StandardErrorContent' \
-                      --output text
-                    exit 1
-                  fi
-                  echo "✅ Deployment successful!"
-                """
-              }
-            }
-          }
-        }
-      }
+    //               if [ "\$STATUS" != "Success" ]; then
+    //                 echo "Deploy failed! Error:"
+    //                 aws ssm get-command-invocation \
+    //                   --command-id ${commandId} \
+    //                   --instance-id ${firstInstance} \
+    //                   --region ${region} \
+    //                   --query 'StandardErrorContent' \
+    //                   --output text
+    //                 exit 1
+    //               fi
+    //               echo "✅ Deployment successful!"
+    //             """
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
 
     // ─────────────────────────────────────────────
     // STAGE 14: Cleanup

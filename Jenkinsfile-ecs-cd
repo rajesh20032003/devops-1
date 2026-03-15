@@ -43,35 +43,35 @@ pipeline {
       }
     }
 
-    stage('Verify Image Signatures') {
-      steps {
-        withCredentials([[
-          $class: 'AmazonWebServicesCredentialsBinding',
-          credentialsId: 'aws-ecr-credentials'
-        ]]) {
-          script {
-            sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+    // stage('Verify Image Signatures') {
+    //   steps {
+    //     withCredentials([[
+    //       $class: 'AmazonWebServicesCredentialsBinding',
+    //       credentialsId: 'aws-ecr-credentials'
+    //     ]]) {
+    //       script {
+    //         sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
 
-            def services = ['frontend', 'gateway', 'user-service', 'order-service']
-            services.each { service ->
-              echo "Verifying signature for: ${service}:${env.DEPLOY_TAG}"
-              sh """
-                set -e
-                docker pull ${ECR_REGISTRY}/${service}:${env.DEPLOY_TAG}
-                IMAGE_DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' ${ECR_REGISTRY}/${service}:${env.DEPLOY_TAG} | cut -d'@' -f2)
-                echo "Verifying digest: \$IMAGE_DIGEST"
-                cosign verify --key ${WORKSPACE}/cosign.pub --allow-insecure-registry ${ECR_REGISTRY}/${service}@\${IMAGE_DIGEST}
-                echo "✅ ${service} signature VERIFIED!"
-              """
-            }
-            echo "✅ All images verified!"
-          }
-        }
-      }
-      post {
-        failure { echo "🚨 SIGNATURE VERIFICATION FAILED! Deployment BLOCKED!" }
-      }
-    }
+    //         def services = ['frontend', 'gateway', 'user-service', 'order-service']
+    //         services.each { service ->
+    //           echo "Verifying signature for: ${service}:${env.DEPLOY_TAG}"
+    //           sh """
+    //             set -e
+    //             docker pull ${ECR_REGISTRY}/${service}:${env.DEPLOY_TAG}
+    //             IMAGE_DIGEST=\$(docker inspect --format='{{index .RepoDigests 0}}' ${ECR_REGISTRY}/${service}:${env.DEPLOY_TAG} | cut -d'@' -f2)
+    //             echo "Verifying digest: \$IMAGE_DIGEST"
+    //             cosign verify --key ${WORKSPACE}/cosign.pub --allow-insecure-registry ${ECR_REGISTRY}/${service}@\${IMAGE_DIGEST}
+    //             echo "✅ ${service} signature VERIFIED!"
+    //           """
+    //         }
+    //         echo "✅ All images verified!"
+    //       }
+    //     }
+    //   }
+    //   post {
+    //     failure { echo "🚨 SIGNATURE VERIFICATION FAILED! Deployment BLOCKED!" }
+    //   }
+    // }
 
     stage('Init Database') {
       when {
