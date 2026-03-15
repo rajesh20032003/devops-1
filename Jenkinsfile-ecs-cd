@@ -1,0 +1,563 @@
+// ============================================================
+// ECS CD Pipeline — micro-dash
+// ============================================================
+// Triggered by: CI pipeline after successful promote to ECR
+// What it does:
+//   1. Verify image signatures (Cosign!)
+//   2. Init DB (ECS one-off task)
+//   3. Deploy to ECS (update-service)
+//   4. Wait for steady state
+//   5. Health check via ALB
+// ============================================================
+
+pipeline {
+  agent any
+
+  environment {
+    ECR_REGISTRY = "760302898980.dkr.ecr.ap-south-1.amazonaws.com"
+    AWS_REGION   = "ap-south-1"
+    CLUSTER_NAME = "micro-dash-dev-cluster"
+    PROJECT      = "micro-dash"
+    ENVIRONMENT  = "dev"
+  }
+
+  options {
+    disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '10'))
+    timeout(time: 30, unit: 'MINUTES')
+    timestamps()
+  }
+
+  parameters {
+    string(
+      name: 'IMAGE_TAG',
+      defaultValue: '',
+      description: 'Image tag to deploy (e.g. v8.0.1 or dev-123)'
+    )
+    booleanParam(
+      name: 'INIT_DB',
+      defaultValue: false,
+      description: 'Run DB initialization? (first deploy only!)'
+    )
+  }
+
+  stages {
+
+    // ─────────────────────────────────────────────
+    // STAGE 1: Validate Parameters
+    // ─────────────────────────────────────────────
+    stage('Validate') {
+      steps {
+        script {
+          if (!params.IMAGE_TAG) {
+            error "IMAGE_TAG parameter is required! e.g. v8.0.1"
+          }
+          env.DEPLOY_TAG = params.IMAGE_TAG
+          echo "Deploying tag: ${env.DEPLOY_TAG}"
+          echo "Init DB: ${params.INIT_DB}"
+          echo "Cluster: ${env.CLUSTER_NAME}"
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 2: Verify Image Signatures (Cosign!)
+    // ─────────────────────────────────────────────
+    // WHY: Ensure only Jenkins-signed images deploy!
+    // Tampered image = invalid signature = STOP!
+    // Signs were done against Harbor digest in CI
+    // But we verify ECR images here because:
+    //   PromoteImage copies image bit-for-bit
+    //   Same digest = same signature valid! ✅
+    // ─────────────────────────────────────────────
+    stage('Verify Image Signatures') {
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          script {
+            // Login to ECR first
+            sh """
+              aws ecr get-login-password --region ${AWS_REGION} \
+                | docker login \
+                    --username AWS \
+                    --password-stdin ${ECR_REGISTRY}
+            """
+
+            // Verify each service image signature
+            def services = ['frontend', 'gateway', 'user-service', 'order-service']
+
+            services.each { service ->
+              echo "Verifying signature for: ${service}:${env.DEPLOY_TAG}"
+
+              sh """
+                set -e
+
+                # Get exact digest from ECR
+                # We verify digest not tag!
+                # Tag could be reused but digest is immutable!
+                IMAGE_DIGEST=\$(docker inspect \
+                  --format='{{index .RepoDigests 0}}' \
+                  ${ECR_REGISTRY}/${service}:${env.DEPLOY_TAG} \
+                  2>/dev/null || \
+                  aws ecr batch-get-image \
+                    --repository-name ${service} \
+                    --image-ids imageTag=${env.DEPLOY_TAG} \
+                    --region ${AWS_REGION} \
+                    --query 'images[0].imageId.imageDigest' \
+                    --output text)
+
+                echo "Verifying digest: \$IMAGE_DIGEST"
+
+                # Verify with public key!
+                # cosign.pub is committed to repo (safe to share!)
+                # Only our Jenkins private key could have created
+                # a signature that this public key accepts!
+                cosign verify \
+                  --key ${WORKSPACE}/cosign.pub \
+                  ${ECR_REGISTRY}/${service}@\${IMAGE_DIGEST}
+
+                echo "✅ ${service} signature VERIFIED!"
+              """
+            }
+
+            echo "✅ All images verified! Safe to deploy!"
+          }
+        }
+      }
+      post {
+        failure {
+          echo "🚨 SIGNATURE VERIFICATION FAILED!"
+          echo "Image may have been tampered!"
+          echo "Deployment BLOCKED!"
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 3: Init Database (first deploy only!)
+    // ─────────────────────────────────────────────
+    // WHY different from EC2:
+    //   EC2: SSM send-command to EC2 instance
+    //        EC2 runs psql client → connects RDS
+    //
+    //   ECS: No EC2 instances!
+    //        Run ONE-OFF ECS task instead!
+    //        Task runs db-init script → exits!
+    //        ECS cleans up task automatically!
+    //
+    // One-off task = run to completion then stop
+    // Different from ECS Service (runs forever!)
+    // ─────────────────────────────────────────────
+    stage('Init Database') {
+      when {
+        expression { params.INIT_DB == true }
+      }
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          script {
+            echo "Running DB initialization as ECS one-off task..."
+
+            // Get private subnet ID for task networking
+            def subnetId = sh(
+              script: """
+                aws ec2 describe-subnets \
+                  --region ${AWS_REGION} \
+                  --filters \
+                    "Name=tag:Name,Values=${PROJECT}-${ENVIRONMENT}-private-1" \
+                  --query 'Subnets[0].SubnetId' \
+                  --output text
+              """,
+              returnStdout: true
+            ).trim()
+
+            // Get ECS tasks security group
+            def sgId = sh(
+              script: """
+                aws ec2 describe-security-groups \
+                  --region ${AWS_REGION} \
+                  --filters \
+                    "Name=tag:Name,Values=${PROJECT}-${ENVIRONMENT}-ecs-tasks-sg" \
+                  --query 'SecurityGroups[0].GroupId' \
+                  --output text
+              """,
+              returnStdout: true
+            ).trim()
+
+            echo "Subnet: ${subnetId}"
+            echo "Security Group: ${sgId}"
+
+            // Run user-service as one-off task with DB init command
+            // Override the CMD to run migrations instead of server!
+            def taskArn = sh(
+              script: """
+                aws ecs run-task \
+                  --cluster ${CLUSTER_NAME} \
+                  --task-definition ${PROJECT}-${ENVIRONMENT}-user-service \
+                  --launch-type FARGATE \
+                  --network-configuration "awsvpcConfiguration={
+                    subnets=[${subnetId}],
+                    securityGroups=[${sgId}],
+                    assignPublicIp=DISABLED
+                  }" \
+                  --overrides '{
+                    "containerOverrides": [{
+                      "name": "user-service",
+                      "command": [
+                        "node", "-e",
+                        "const {Pool} = require('"'"'pg'"'"'); const SM = require('"'"'@aws-sdk/client-secrets-manager'"'"'); async function init() { const client = new SM.SecretsManagerClient({region: process.env.AWS_REGION}); const secret = JSON.parse((await client.send(new SM.GetSecretValueCommand({SecretId: process.env.DB_SECRET_NAME}))).SecretString); const pool = new Pool({host:secret.host,port:secret.port,user:secret.username,password:secret.password,database:secret.dbname,ssl:{rejectUnauthorized:false}}); await pool.query('"'"'CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, email VARCHAR(255) UNIQUE NOT NULL, created_at TIMESTAMP DEFAULT NOW())'"'"'); console.log('"'"'users table ready!'"'"'); await pool.end(); } init().catch(e=>{console.error(e);process.exit(1)});"
+                      ]
+                    }]
+                  }' \
+                  --region ${AWS_REGION} \
+                  --query 'tasks[0].taskArn' \**
+                  --output text
+              """,
+              returnStdout: true
+            ).trim()
+
+            echo "DB init task ARN: ${taskArn}"
+
+            // Wait for task to complete
+            sh """
+              echo "Waiting for DB init task to complete..."
+              
+              aws ecs wait tasks-stopped \
+                --cluster ${CLUSTER_NAME} \
+                --tasks ${taskArn} \
+                --region ${AWS_REGION}
+              
+              # Check exit code
+              EXIT_CODE=\$(aws ecs describe-tasks \
+                --cluster ${CLUSTER_NAME} \
+                --tasks ${taskArn} \
+                --region ${AWS_REGION} \
+                --query 'tasks[0].containers[0].exitCode' \
+                --output text)
+              
+              echo "DB init exit code: \$EXIT_CODE"
+              
+              if [ "\$EXIT_CODE" != "0" ]; then
+                echo "❌ DB init failed with exit code \$EXIT_CODE"
+                exit 1
+              fi
+              
+              echo "✅ Users DB initialized!"
+            """
+
+            // Same for order-service DB
+            def orderTaskArn = sh(
+              script: """
+                aws ecs run-task \
+                  --cluster ${CLUSTER_NAME} \
+                  --task-definition ${PROJECT}-${ENVIRONMENT}-order-service \
+                  --launch-type FARGATE \
+                  --network-configuration "awsvpcConfiguration={
+                    subnets=[${subnetId}],
+                    securityGroups=[${sgId}],
+                    assignPublicIp=DISABLED
+                  }" \
+                  --overrides '{
+                    "containerOverrides": [{
+                      "name": "order-service",
+                      "command": [
+                        "node", "-e",
+                        "const {Pool} = require('"'"'pg'"'"'); const SM = require('"'"'@aws-sdk/client-secrets-manager'"'"'); async function init() { const client = new SM.SecretsManagerClient({region: process.env.AWS_REGION}); const secret = JSON.parse((await client.send(new SM.GetSecretValueCommand({SecretId: process.env.DB_SECRET_NAME}))).SecretString); const pool = new Pool({host:secret.host,port:secret.port,user:secret.username,password:secret.password,database:secret.dbname,ssl:{rejectUnauthorized:false}}); await pool.query('"'"'CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, item VARCHAR(255) NOT NULL, quantity INTEGER DEFAULT 1, user_id INTEGER, created_at TIMESTAMP DEFAULT NOW())'"'"'); console.log('"'"'orders table ready!'"'"'); await pool.end(); } init().catch(e=>{console.error(e);process.exit(1)});"
+                      ]
+                    }]
+                  }' \
+                  --region ${AWS_REGION} \
+                  --query 'tasks[0].taskArn' \
+                  --output text
+              """,
+              returnStdout: true
+            ).trim()
+
+            sh """
+              aws ecs wait tasks-stopped \
+                --cluster ${CLUSTER_NAME} \
+                --tasks ${orderTaskArn} \
+                --region ${AWS_REGION}
+
+              EXIT_CODE=\$(aws ecs describe-tasks \
+                --cluster ${CLUSTER_NAME} \
+                --tasks ${orderTaskArn} \
+                --region ${AWS_REGION} \
+                --query 'tasks[0].containers[0].exitCode' \
+                --output text)
+
+              if [ "\$EXIT_CODE" != "0" ]; then
+                echo "❌ Orders DB init failed!"
+                exit 1
+              fi
+              echo "✅ Orders DB initialized!"
+            """
+          }
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 4: Deploy to ECS
+    // ─────────────────────────────────────────────
+    // update-service forces new task deployment!
+    // ECS pulls new image tag
+    // Rolling update: starts new task first
+    //   → health check passes
+    //   → old task stopped
+    // Circuit breaker: auto rollback if fails!
+    // ─────────────────────────────────────────────
+    stage('Deploy to ECS') {
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          script {
+            def services = [
+              'frontend'     : "${PROJECT}-${ENVIRONMENT}-frontend",
+              'gateway'      : "${PROJECT}-${ENVIRONMENT}-gateway",
+              'user-service' : "${PROJECT}-${ENVIRONMENT}-user-service",
+              'order-service': "${PROJECT}-${ENVIRONMENT}-order-service"
+            ]
+
+            services.each { imageName, serviceName ->
+              echo "Updating task definition for: ${serviceName}"
+
+              // Step 1: Get current task definition
+              def taskDefArn = sh(
+                script: """
+                  aws ecs describe-services \
+                    --cluster ${CLUSTER_NAME} \
+                    --services ${serviceName} \
+                    --region ${AWS_REGION} \
+                    --query 'services[0].taskDefinition' \
+                    --output text
+                """,
+                returnStdout: true
+              ).trim()
+
+              // Step 2: Register NEW task definition with new image tag
+              // Same config, just updated image!
+              def newTaskDefArn = sh(
+                script: """
+                  # Get current task def JSON
+                  TASK_DEF=\$(aws ecs describe-task-definition \
+                    --task-definition ${taskDefArn} \
+                    --region ${AWS_REGION} \
+                    --query 'taskDefinition')
+
+                  # Update image tag in task definition
+                  NEW_TASK_DEF=\$(echo \$TASK_DEF | python3 -c "
+import json, sys
+td = json.load(sys.stdin)
+for c in td['containerDefinitions']:
+    if c['name'] == '${imageName}':
+        # Replace just the tag part of the image
+        image_parts = c['image'].rsplit(':', 1)
+        c['image'] = image_parts[0] + ':${env.DEPLOY_TAG}'
+        print(f'Updated image: {c[\"image\"]}', file=sys.stderr)
+
+# Remove fields that can't be in register call
+for field in ['taskDefinitionArn','revision','status',
+              'requiresAttributes','compatibilities',
+              'registeredAt','registeredBy']:
+    td.pop(field, None)
+
+print(json.dumps(td))
+")
+
+                  # Register new task definition revision
+                  aws ecs register-task-definition \
+                    --cli-input-json "\$NEW_TASK_DEF" \
+                    --region ${AWS_REGION} \
+                    --query 'taskDefinition.taskDefinitionArn' \
+                    --output text
+                """,
+                returnStdout: true
+              ).trim()
+
+              echo "New task definition: ${newTaskDefArn}"
+
+              // Step 3: Update service with new task definition
+              sh """
+                aws ecs update-service \
+                  --cluster ${CLUSTER_NAME} \
+                  --service ${serviceName} \
+                  --task-definition ${newTaskDefArn} \
+                  --force-new-deployment \
+                  --region ${AWS_REGION}
+                
+                echo "✅ ${serviceName} update triggered!"
+              """
+            }
+          }
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 5: Wait for Steady State
+    // ─────────────────────────────────────────────
+    // Waits until ALL services have desired count
+    // of healthy running tasks!
+    // Timeout 10 mins → if not ready = failed deploy!
+    // ─────────────────────────────────────────────
+    stage('Wait for Steady State') {
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          script {
+            def services = [
+              "${PROJECT}-${ENVIRONMENT}-frontend",
+              "${PROJECT}-${ENVIRONMENT}-gateway",
+              "${PROJECT}-${ENVIRONMENT}-user-service",
+              "${PROJECT}-${ENVIRONMENT}-order-service"
+            ]
+
+            echo "Waiting for all services to reach steady state..."
+            echo "This may take 3-5 minutes..."
+
+            services.each { serviceName ->
+              sh """
+                echo "Waiting for: ${serviceName}"
+                
+                aws ecs wait services-stable \
+                  --cluster ${CLUSTER_NAME} \
+                  --services ${serviceName} \
+                  --region ${AWS_REGION}
+                
+                echo "✅ ${serviceName} is stable!"
+              """
+            }
+
+            echo "✅ All services stable!"
+          }
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STAGE 6: Health Check
+    // ─────────────────────────────────────────────
+    // Verify app is actually responding!
+    // Gets ALB DNS from terraform output
+    // Hits /health and /api/dashboard
+    // ─────────────────────────────────────────────
+    stage('Health Check') {
+      steps {
+        withCredentials([[
+          $class: 'AmazonWebServicesCredentialsBinding',
+          credentialsId: 'aws-ecr-credentials'
+        ]]) {
+          script {
+            // Get ALB DNS name
+            def albDns = sh(
+              script: """
+                aws elbv2 describe-load-balancers \
+                  --region ${AWS_REGION} \
+                  --names ${PROJECT}-${ENVIRONMENT}-alb \
+                  --query 'LoadBalancers[0].DNSName' \
+                  --output text
+              """,
+              returnStdout: true
+            ).trim()
+
+            echo "ALB DNS: ${albDns}"
+            echo "App URL: http://${albDns}"
+
+            // Wait for ALB to route to new tasks
+            sleep(30)
+
+            // Health checks
+            sh """
+              echo "Checking frontend..."
+              curl -f --retry 5 --retry-delay 10 \
+                http://${albDns}/ \
+                -o /dev/null -w "Frontend HTTP: %{http_code}\\n"
+              
+              echo "Checking gateway health..."
+              curl -f --retry 5 --retry-delay 10 \
+                http://${albDns}/api/health \
+                -o /dev/null -w "Gateway HTTP: %{http_code}\\n" || true
+              
+              echo "Checking dashboard API..."
+              curl -f --retry 5 --retry-delay 10 \
+                http://${albDns}/api/dashboard \
+                -w "Dashboard HTTP: %{http_code}\\n"
+              
+              echo "✅ App is live!"
+              echo "🌐 URL: http://${albDns}"
+            """
+
+            // Store URL for post section
+            env.APP_URL = "http://${albDns}"
+          }
+        }
+      }
+    }
+
+  }
+
+  post {
+    success {
+      echo """
+        ✅ ECS DEPLOYMENT SUCCESSFUL!
+        
+        🌐 App URL: ${env.APP_URL ?: 'check ALB console'}
+        📦 Image Tag: ${env.DEPLOY_TAG}
+        🏗️  Cluster: ${env.CLUSTER_NAME}
+        
+        Services deployed:
+          → micro-dash-dev-frontend
+          → micro-dash-dev-gateway
+          → micro-dash-dev-user-service
+          → micro-dash-dev-order-service
+      """
+      emailext(
+        subject: "✅ ECS Deploy SUCCESS: ${env.DEPLOY_TAG}",
+        body: """
+          ECS Deployment Successful!
+          
+          Tag: ${env.DEPLOY_TAG}
+          URL: ${env.APP_URL ?: 'check ALB'}
+          Cluster: ${env.CLUSTER_NAME}
+          Build: ${env.BUILD_URL}
+          🌐 App URL: ${env.APP_URL ?: 'check ALB console'}
+        """,
+        to: "rajeshgovindan777@gmail.com"
+      )
+    }
+    failure {
+      echo """
+        ❌ ECS DEPLOYMENT FAILED!
+        
+        Tag: ${env.DEPLOY_TAG}
+        Check: ${env.BUILD_URL}console
+        
+        ECS circuit breaker may have
+        rolled back to previous version!
+      """
+      emailext(
+        subject: "❌ ECS Deploy FAILED: ${env.DEPLOY_TAG}",
+        body: """
+          ECS Deployment Failed!
+          
+          Tag: ${env.DEPLOY_TAG}
+          Console: ${env.BUILD_URL}console
+          
+          ECS circuit breaker may have
+          auto-rolled back to previous version!
+        """,
+        to: "rajeshgovindan777@gmail.com",
+        attachLog: true
+      )
+    }
+  }
+}

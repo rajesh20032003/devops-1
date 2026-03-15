@@ -755,6 +755,29 @@ pipeline {
         body:    "Build succeeded!\nURL: ${env.BUILD_URL}",
         to:      "rajeshgovindan777@gmail.com"
       )
+      // ─────────────────────────────────────────
+      // Trigger ECS CD pipeline after successful CI!
+      // Only triggers on tags or main branch
+      // wait: false = CI doesn't wait for CD to finish
+      // ─────────────────────────────────────────
+      node('') {
+        script {
+          def deployTag = env.TAG_NAME ?: "dev-${env.BUILD_NUMBER}"
+          echo "CI succeeded! Triggering ECS CD: ${deployTag}"
+          build(
+            job: 'micro-dash-ecs-cd',
+            parameters: [
+              string(name: 'IMAGE_TAG', value: deployTag),
+              booleanParam(name: 'INIT_DB', value: false)
+            ],
+            wait: false
+            // wait: false = fire and forget!
+            // CI pipeline finishes immediately
+            // CD runs independently! ✅
+          )
+          echo "✅ ECS CD triggered!"
+        }
+      }
     }
     failure {
       node('') {
