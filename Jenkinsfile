@@ -103,7 +103,7 @@ pipeline {
         stage('Gateway') {
           when {
             beforeAgent true
-            anyOf { changeset "**/gateway/**"; buildingTag(); branch 'main' }
+            anyOf { changeset "**/gateway/**"; buildingTag(); }
           }
           // no agent block — nodeQualityCheck creates K8s pod internally
           steps {
@@ -116,7 +116,7 @@ pipeline {
         stage('User Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/user-service/**"; buildingTag();  branch 'main' }
+            anyOf { changeset "**/user-service/**"; buildingTag(); }
           }
           steps {
             Nodequalitycheck('user-service')
@@ -126,7 +126,7 @@ pipeline {
         stage('Order Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/order-service/**"; buildingTag(); branch 'main' }
+            anyOf { changeset "**/order-service/**"; buildingTag(); }
           }
           steps {
             // passes extraSteps closure to clear jest cache before running
@@ -140,7 +140,7 @@ pipeline {
         stage('Frontend') {
           when {
             beforeAgent true
-            anyOf { changeset "**/frontend/**"; buildingTag(); branch 'main' }
+            anyOf { changeset "**/frontend/**"; buildingTag(); }
           }
           steps {
             // lintOnly = true:
@@ -164,7 +164,7 @@ pipeline {
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**";
-           buildingTag(); branch 'main'
+           buildingTag(); 
         }
       }
       agent any
@@ -219,7 +219,7 @@ pipeline {
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
           changeset "user-service/**"; changeset "frontend/**"
-          buildingTag(); branch 'main'
+          buildingTag();
         }
       }
       agent any
@@ -311,7 +311,7 @@ pipeline {
       parallel {
 
         stage('Scan Frontend') {
-          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag();  } }
           agent any
           steps {
             measureStage('Trivy_Scan_frontend') {
@@ -360,7 +360,7 @@ pipeline {
       parallel {
 
         stage('Frontend') {
-          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag();  } }
           agent any
           steps {
             measureStage('SBOM_frontend') {
@@ -370,7 +370,7 @@ pipeline {
         }
 
         stage('Gateway') {
-          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag();  branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); } }
           agent any
           steps {
             measureStage('SBOM_gateway') {
@@ -380,7 +380,7 @@ pipeline {
         }
 
         stage('User Service') {
-          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag();  branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag();  } }
           agent any
           steps {
             measureStage('SBOM_user_service') {
@@ -390,7 +390,7 @@ pipeline {
         }
 
         stage('Order Service') {
-          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag();  } }
           agent any
           steps {
             measureStage('SBOM_order_service') {
