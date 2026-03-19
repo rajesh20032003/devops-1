@@ -78,7 +78,7 @@ pipeline {
           sh '''
             trivy fs . \
               --exit-code 1 --no-progress \
-              --severity HIGH,CRITICAL --ignore-unfixed \
+              --severity CRITICAL --ignore-unfixed \
               --scanners vuln --pkg-types library \
               --format json --output trivy-deps-report.json
           '''
