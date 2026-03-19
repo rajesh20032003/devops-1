@@ -44,9 +44,7 @@ async function getSecret() {
   // ── Docker Secrets (Stage 2 — local dev) ──────────────────
   // If /run/secrets/db_password exists, use it
   try {
-    const password = fs
-      .readFileSync('/run/secrets/db_password', 'utf8')
-      .trim();
+    const password = fs.readFileSync('/run/secrets/db_password', 'utf8').trim();
     console.log('Password loaded from Docker secret ✅');
     return { password };
   } catch {
@@ -71,10 +69,10 @@ async function getPool() {
     // AWS Secrets Manager returns full connection info
     // Docker secret / env var only returns password
     // so we fallback to env vars for host/port/db/user
-    host:     secret.host     || process.env.DB_HOST,
-    port:     secret.port     || parseInt(process.env.DB_PORT) || 5432,
-    database: secret.dbname   || process.env.DB_NAME,
-    user:     secret.username || process.env.DB_USER,
+    host: secret.host || process.env.DB_HOST,
+    port: secret.port || parseInt(process.env.DB_PORT) || 5432,
+    database: secret.dbname || process.env.DB_NAME,
+    user: secret.username || process.env.DB_USER,
     password: secret.password,
 
     max: 10,
@@ -83,9 +81,7 @@ async function getPool() {
 
     // SSL required for RDS in production
     // not needed locally
-    ssl: process.env.DB_SECRET_NAME
-      ? { rejectUnauthorized: false }
-      : false,
+    ssl: process.env.DB_SECRET_NAME ? { rejectUnauthorized: false } : false,
   });
 
   // Test connection

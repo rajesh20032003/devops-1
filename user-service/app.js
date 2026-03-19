@@ -77,7 +77,6 @@ app.get('/test', (req, res) => {
   res.status(200).send('OK');
 });
 
-
 // Auto-init DB on startup
 const initDB = async () => {
   try {
