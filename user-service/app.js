@@ -77,4 +77,34 @@ app.get('/test', (req, res) => {
   res.status(200).send('OK');
 });
 
+
+// Auto-init DB on startup
+const initDB = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        email VARCHAR(100) UNIQUE,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    const count = await pool.query('SELECT COUNT(*) FROM users');
+    if (parseInt(count.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO users (name, email) VALUES
+          ('Rajesh', 'rajesh@example.com'),
+          ('DevOps Engineer', 'devops@example.com'),
+          ('Alice', 'alice@example.com'),
+          ('Bob', 'bob@example.com')
+      `);
+      console.log('✅ Users seeded!');
+    }
+    console.log('✅ Users DB initialized!');
+  } catch (err) {
+    console.error('DB init failed:', err.message);
+  }
+};
+initDB();
+
 module.exports = app;

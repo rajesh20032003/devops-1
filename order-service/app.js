@@ -50,4 +50,37 @@ app.get('/health', async (req, res) => {
 
 app.get('/test', (req, res) => res.status(200).send('OK'));
 
+
+// Auto-init DB on startup
+const initDB = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        item VARCHAR(200) NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        user_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    // Only insert if table is empty!
+    const count = await pool.query('SELECT COUNT(*) FROM orders');
+    if (parseInt(count.rows[0].count) === 0) {
+      await pool.query(`
+        INSERT INTO orders (item, quantity, user_id) VALUES
+          ('Cement Bags', 10, 1),
+          ('Steel Rods', 50, 1),
+          ('Bricks', 200, 2),
+          ('Sand Bags', 30, 2)
+      `);
+      console.log('✅ Orders seeded!');
+    } else {
+      console.log('✅ Orders table already has data!');
+    }
+  } catch (err) {
+    console.error('DB init failed:', err.message);
+  }
+};
+initDB();
+
 module.exports = app;
