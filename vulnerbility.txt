@@ -1,0 +1,12 @@
+Interviewer: "Did your pipeline ever
+              catch a real vulnerability?"
+
+You: "YES! CVE-2026-32767 in libexpat
+      was found in our nginx alpine
+      base image. Severity CRITICAL.
+      Pipeline blocked the deployment.
+      We fixed by upgrading to
+      nginx:alpine with patched libexpat.
+      
+      This is exactly why we have
+      Trivy image scanning in CI!"

@@ -43,7 +43,7 @@ pipeline {
       }
     }
 
-    stage('Verify Image Signatures') {
+    stage('Verify Image Signatures!') {
       steps {
         withCredentials([[
           $class: 'AmazonWebServicesCredentialsBinding',
