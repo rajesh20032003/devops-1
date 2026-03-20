@@ -464,98 +464,118 @@ pipeline {
     // ─────────────────────────────────────────────
     // STAGE 12: Sign Images
     // ─────────────────────────────────────────────
-    stage('Sign Images') {
-      parallel {
-
-        stage('Sign Frontend') {
-          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
-          agent any
-          steps {
-            measureStage('Sign_frontend') {
-              SignImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+    stage('Promote Images') {
+        parallel {
+          stage('Promote Frontend') {
+            when { beforeAgent true
+              anyOf { changeset 'frontend/**'
+                      buildingTag()
+                      branch 'main' } }
+            agent any
+            steps {
+              measureStage('Promote_frontend') {
+                PromoteImage('frontend',
+                  env.HARBOR_REGISTRY,
+                  env.HARBOR_PROJECT,
+                  env.ECR_REGISTRY)
+              }
+            }
+          }
+          stage('Promote Gateway') {
+            when { beforeAgent true
+              anyOf { changeset 'gateway/**'
+                      buildingTag() } }
+            agent any
+            steps {
+              measureStage('Promote_gateway') {
+                PromoteImage('gateway',
+                  env.HARBOR_REGISTRY,
+                  env.HARBOR_PROJECT,
+                  env.ECR_REGISTRY)
+              }
+            }
+          }
+          stage('Promote User Service') {
+            when { beforeAgent true
+              anyOf { changeset 'user-service/**'
+                      buildingTag() } }
+            agent any
+            steps {
+              measureStage('Promote_user_service') {
+                PromoteImage('user-service',
+                  env.HARBOR_REGISTRY,
+                  env.HARBOR_PROJECT,
+                  env.ECR_REGISTRY)
+              }
+            }
+          }
+            stage('Promote Order Service') {
+              when { beforeAgent true
+                anyOf { changeset 'order-service/**'
+                        buildingTag() } }
+              agent any
+              steps {
+                measureStage('Promote_order_service') {
+                  PromoteImage('order-service',
+                    env.HARBOR_REGISTRY,
+                    env.HARBOR_PROJECT,
+                    env.ECR_REGISTRY)
+                }
+              }
             }
           }
         }
-
-        stage('Sign Gateway') {
-          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
-          agent any
-          steps {
-            measureStage('Sign_gateway') {
-              SignImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-            }
-          }
-        }
-
-        stage('Sign User Service') {
-          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
-          agent any
-          steps {
-            measureStage('Sign_user_service') {
-              SignImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-            }
-          }
-        }
-
-        stage('Sign Order Service') {
-          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
-          agent any
-          steps {
-            measureStage('Sign_order_service') {
-              SignImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-            }
-          }
-        }
-
-      }
-    }
 
     // ─────────────────────────────────────────────
     // STAGE 13: Promote Harbor → ECR
     // ─────────────────────────────────────────────
-    stage('Promote Images') {
+   stage('Sign Images') {
       parallel {
-
-        stage('Promote Frontend') {
-          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+        stage('Sign Frontend') {
+          when { beforeAgent true
+            anyOf { changeset 'frontend/**'
+                    buildingTag()
+                    branch 'main' } }
           agent any
           steps {
-            measureStage('Promote_frontend') {
-              PromoteImage('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            measureStage('Sign_frontend') {
+              SignImage('frontend', env.ECR_REGISTRY)
             }
           }
         }
-
-        stage('Promote Gateway') {
-          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag() } }
+        stage('Sign Gateway') {
+          when { beforeAgent true
+            anyOf { changeset 'gateway/**'
+                    buildingTag() } }
           agent any
           steps {
-            measureStage('Promote_gateway') {
-              PromoteImage('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            measureStage('Sign_gateway') {
+              SignImage('gateway', env.ECR_REGISTRY)
             }
           }
         }
-
-        stage('Promote User Service') {
-          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag() } }
+        stage('Sign User Service') {
+          when { beforeAgent true
+            anyOf { changeset 'user-service/**'
+                    buildingTag() } }
           agent any
           steps {
-            measureStage('Promote_user_service') {
-              PromoteImage('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            measureStage('Sign_user_service') {
+              SignImage('user-service', env.ECR_REGISTRY)
             }
           }
         }
-
-        stage('Promote Order Service') {
-          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag() } }
+        stage('Sign Order Service') {
+          when { beforeAgent true
+            anyOf { changeset 'order-service/**'
+                    buildingTag() } }
           agent any
           steps {
-            measureStage('Promote_order_service') {
-              PromoteImage('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT, env.ECR_REGISTRY)
+            measureStage('Sign_order_service') {
+              SignImage('order-service', env.ECR_REGISTRY)
             }
           }
         }
-
       }
     }
 // ─────────────────────────────────────────────
