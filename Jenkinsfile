@@ -774,38 +774,37 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'github-gitops-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]){
         sh """
-          # 1. Safety check: Did we actually build any images?
-          if [ ! -f built_services.txt ]; then
-            echo "No services built in this run. Skipping GitOps update."
-            exit 0
-          fi
-
-          git config --global user.email "jenkins@micro-dash.com"
-          git config --global user.name "jenkins CI"
-
-          # 2. FIX: Delete the leftover folder from previous failed builds
-          rm -rf devops-1-k8-agrocd
-
-          # 3. FIX: Removed > /dev/null so we can read the errors!
-          git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git
-          
-          cd devops-1-k8-agrocd
-          
-          for svc in \$(cat ../*_updated.txt | sort -u); do
-  echo "Updating YAML for \$svc to tag ${env.IMAGE_TAG}..."
+  set -x
   
-  # Run your yq command
-  docker run --rm --volumes-from \$(hostname) -w \$(pwd) mikefarah/yq \
-    -i ".\${svc}.Tag = \"${env.IMAGE_TAG}\"" values.yaml
-done
+  # NEW SAFEGUARD: Check if ANY _updated.txt files exist
+  if ! ls ../*_updated.txt 1> /dev/null 2>&1; then
+      echo "No services built in this run. Skipping GitOps update."
+      exit 0
+  fi
 
-# Combine them for the commit message so it says "frontend gateway user-service"
-UPDATED_SERVICES=\$(cat ../*_updated.txt | sort -u | tr '\n' ' ')
+  git config --global user.email "jenkins@micro-dash.com"
+  git config --global user.name "jenkins CI"
+  
+  rm -rf devops-1-k8-agrocd
+  git clone https://${GITHUB_TOKEN}@github.com/rajesh20032003/devops-1-k8-agrocd.git
+  cd devops-1-k8-agrocd
 
-          git add values.yaml
-          git commit -m "ci: deploy ${env.IMAGE_TAG} for \$(cat ../built_services.txt | tr '\\n' ' ')"
-          git push origin HEAD:main 
-        """
+  # Combine all the individual files into one list and loop
+  for svc in \$(cat ../*_updated.txt | sort -u); do
+    echo "Updating YAML for \$svc to tag ${env.IMAGE_TAG}..."
+    
+    # Update the specific service in values.yaml
+    docker run --rm --volumes-from \$(hostname) -w \$(pwd) mikefarah/yq \
+      -i ".\${svc}.Tag = \"${env.IMAGE_TAG}\"" values.yaml
+  done
+
+  # Combine them for the commit message
+  UPDATED_SERVICES=\$(cat ../*_updated.txt | sort -u | tr '\n' ' ')
+
+  git add values.yaml
+  git commit -m "ci: deploy ${env.IMAGE_TAG} for \$UPDATED_SERVICES"
+  git push origin HEAD:main
+"""
       }
       }
     }
