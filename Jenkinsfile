@@ -285,7 +285,7 @@ pipeline {
           steps {
             measureStage('Build_Push_frontend') {
               BuildAndPush('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
+              sh "echo 'frontend' > frontend_updated.txt"
             }
             
           }
@@ -297,7 +297,7 @@ pipeline {
           steps {
             measureStage('Build_Push_gateway') {
               BuildAndPush('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-             sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
+             sh "echo 'user-service' > user-service_updated.txt"
             }
           }
         }
@@ -308,7 +308,7 @@ pipeline {
           steps {
             measureStage('Build_Push_user_service') {
               BuildAndPush('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
+              sh "echo 'order-service' > order-service_updated.txt"
             }
           }
         }
@@ -319,7 +319,7 @@ pipeline {
           steps {
             measureStage('Build_Push_order_service') {
               BuildAndPush('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
+              echo "\$SERVICE" > "\$SERVICE"_updated.txt
             }
           }
         }

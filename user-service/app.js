@@ -99,7 +99,7 @@ const initDB = async () => {
       `);
       console.log('✅ Users seeded');
     }
-    console.log('✅ Users DB initialized!');
+    console.log('✅ Users DB initialized!!');
   } catch (err) {
     console.error('DB init failed:', err.message);
   }
