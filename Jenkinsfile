@@ -103,7 +103,7 @@ pipeline {
         stage('Gateway') {
           when {
             beforeAgent true
-            anyOf { changeset "**/gateway/**"; buildingTag(); }
+            anyOf { changeset "**/gateways/**"; buildingTag(); }
           }
           // no agent block — nodeQualityCheck creates K8s pod internally
           steps {
@@ -116,7 +116,7 @@ pipeline {
         stage('User Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/user-service/**"; buildingTag(); }
+            anyOf { changeset "**/user-services/**"; buildingTag(); }
           }
           steps {
             Nodequalitycheck('user-service')
@@ -126,7 +126,7 @@ pipeline {
         stage('Order Service') {
           when {
             beforeAgent true
-            anyOf { changeset "**/order-service/**"; buildingTag(); }
+            anyOf { changeset "**/order-services/**"; buildingTag(); }
           }
           steps {
             // passes extraSteps closure to clear jest cache before running
@@ -140,7 +140,7 @@ pipeline {
         stage('Frontend') {
           when {
             beforeAgent true
-            anyOf { changeset "**/frontend/**"; buildingTag(); }
+            anyOf { changeset "**/frontends/**"; buildingTag(); }
           }
           steps {
             // lintOnly = true:
@@ -777,7 +777,7 @@ pipeline {
   set -x
   
   # NEW SAFEGUARD: Check if ANY _updated.txt files exist
-  if ! ls ../*_updated.txt 1> /dev/null 2>&1; then
+  if ! ls *_updated.txt 1> /dev/null 2>&1; then
       echo "No services built in this run. Skipping GitOps update."
       exit 0
   fi
