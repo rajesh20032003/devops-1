@@ -791,7 +791,7 @@ pipeline {
           
           cd devops-1-k8-agrocd
           
-          for SERVICE in \$(cat ../built_services.txt); do
+          for SERVICE in \$(cat ../built_services.txt | sort -u); do
             echo "Updating YAML for \$SERVICE to tag ${env.IMAGE_TAG}..."
             
             docker run --rm \
