@@ -773,12 +773,17 @@ pipeline {
           git config --global user.email "jenkins@micro-dash.com"
           git config --global user.name "jenkins CI"
 
-          git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git > /dev/null 2>&1
+          git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git > /dev/null 2>&1
               cd devops-1-k8-agrocd
           for SERVICE in \$(cat ../built_services.txt); do
                   echo "Updating YAML for \$SERVICE to tag ${env.IMAGE_TAG}..."
-                  docker run --rm -v \$(pwd):/workdir mikefarah/yq -i ".\$SERVICE.Tag = \\"${env.IMAGE_TAG}\\"" /workdir/values.yaml
-          done 
+                  
+                  docker run --rm \
+                    --volumes-from \$(cat /etc/hostname) \
+                    -w \$(pwd) \
+                    mikefarah/yq -i ".\$SERVICE.Tag = \\"${env.IMAGE_TAG}\\"" values.yaml
+                  
+                done
 
           git add values.yaml
           git commit -m "ci: deploy ${env.IMAGE_TAG} for \$(cat ../built_services.txt | tr '\\n' ' ')"
