@@ -172,9 +172,24 @@ pipeline {
       steps {
         measureStage('SonarQube_Analysis') {
            script {
-        unstash name: 'coverage-gateway'
-        unstash name: 'coverage-user-service'
-        unstash name: 'coverage-order-service'
+        try { 
+              unstash name: 'coverage-gateway' 
+            } catch (e) { 
+              echo "No gateway coverage stash found. Skipping." 
+            }
+            
+            try { 
+              unstash name: 'coverage-user-service' 
+            } catch (e) { 
+              echo "No user-service coverage stash found. Skipping." 
+            }
+            
+            try { 
+              unstash name: 'coverage-order-service' 
+            } catch (e) { 
+              echo "No order-service coverage stash found. Skipping." 
+            }
+          }
       }
           withSonarQubeEnv('sonarqube') {
             sh '''
