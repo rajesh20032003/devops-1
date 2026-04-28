@@ -154,7 +154,7 @@ pipeline {
         }
 
       }
-    }
+     }
     // ─────────────────────────────────────────────
     // STAGE 5: SonarQube Analysis
     // ─────────────────────────────────────────────
@@ -242,8 +242,7 @@ pipeline {
         beforeAgent true
         anyOf {
           changeset "gateway/**"; changeset "order-service/**"
-          changeset "user-service/**"; changeset "frontend/**"
-          branch 'main'; buildingTag()
+          changeset "user-service/**"; changeset "frontend/**";  buildingTag()
         }
       }
       agent any
@@ -262,41 +261,46 @@ pipeline {
       parallel {
 
         stage('Frontend') {
-          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'frontend/**'; buildingTag() } }
           agent any
           steps {
             measureStage('Build_Push_frontend') {
               BuildAndPush('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+              sh 'echo "frontend" >> built_services.txt'
             }
+            
           }
         }
 
         stage('Gateway') {
-          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'gateway/**'; buildingTag() } }
           agent any
           steps {
             measureStage('Build_Push_gateway') {
               BuildAndPush('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+              sh 'echo "gateway" >> built_services.txt'
             }
           }
         }
 
         stage('User Service') {
-          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'user-service/**'; buildingTag() } }
           agent any
           steps {
             measureStage('Build_Push_user_service') {
               BuildAndPush('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+              sh 'echo "user-service" >> built_services.txt'
             }
           }
         }
 
         stage('Order Service') {
-          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag(); branch 'main' } }
+          when { beforeAgent true; anyOf { changeset 'order-service/**'; buildingTag() } }
           agent any
           steps {
             measureStage('Build_Push_order_service') {
               BuildAndPush('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
+              sh 'echo "order-service" >> built_services.txt'
             }
           }
         }
@@ -470,7 +474,7 @@ pipeline {
             when { beforeAgent true
               anyOf { changeset 'frontend/**'
                       buildingTag()
-                      branch 'main' } }
+                       } }
             agent any
             steps {
               measureStage('Promote_frontend') {
@@ -535,7 +539,7 @@ pipeline {
           when { beforeAgent true
             anyOf { changeset 'frontend/**'
                     buildingTag()
-                    branch 'main' } }
+                     } }
           agent any
           steps {
             measureStage('Sign_frontend') {
@@ -662,7 +666,7 @@ pipeline {
     // ─────────────────────────────────────────────
     // STAGE 15: Deploy to EC2
     // ─────────────────────────────────────────────
-    // stage('Deploy to EC2') {
+ //  stage('Deploy to EC2') {
     //     when { buildingTag() }
     //     agent any
     //     steps {
@@ -742,6 +746,32 @@ pipeline {
     //     }
     //   }
 
+  stage('update gitops manifests') {
+      when {
+        beforeAgent true 
+        anyOf { branch 'main', buildingTag() }
+      }
+      agent any 
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'github-gitops-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')])
+        sh """
+          git config --global user.email "jenkins@micro-dash.com"
+          git config --global user.name "jenkins CI"
+
+          git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git > /dev/null 2>&1
+              cd devops-1-k8-agrocd
+          for SERVICE in \$(cat ../built_services.txt); do
+                  echo "Updating YAML for \$SERVICE to tag ${env.IMAGE_TAG}..."
+                  docker run --rm -v \$(pwd):/workdir mikefarah/yq -i ".\$SERVICE.Tag = \\"${env.IMAGE_TAG}\\"" /workdir/values.yaml
+          done 
+
+          git add values.yaml
+          git commit -m "ci: deploy ${env.IMAGE_TAG} for \$(cat ../built_services.txt | tr '\\n' ' ')"
+          git push origin HEAD:main 
+        """
+      }
+    }
+
     // ─────────────────────────────────────────────
     // STAGE 14: Cleanup
     // ─────────────────────────────────────────────
@@ -780,24 +810,24 @@ pipeline {
       // Only triggers on tags or main branch
       // wait: false = CI doesn't wait for CD to finish
       // ─────────────────────────────────────────
-      node('') {
-        script {
-          def deployTag = env.TAG_NAME ?: "dev-${env.BUILD_NUMBER}"
-          echo "CI succeeded! Triggering ECS CD: ${deployTag}"
-          build(
-            job: 'micro-dash-ecs-cd',
-            parameters: [
-              string(name: 'IMAGE_TAG', value: deployTag),
-              booleanParam(name: 'INIT_DB', value: false)
-            ],
-            wait: false
-            // wait: false = fire and forget!
-            // CI pipeline finishes immediately
-            // CD runs independently! ✅
-          )
-          echo "✅ ECS CD triggered!"
-        }
-      }
+      // node('') {
+      //   script {
+      //     def deployTag = env.TAG_NAME ?: "dev-${env.BUILD_NUMBER}"
+      //     echo "CI succeeded! Triggering ECS CD: ${deployTag}"
+      //     build(
+      //       job: 'micro-dash-ecs-cd',
+      //       parameters: [
+      //         string(name: 'IMAGE_TAG', value: deployTag),
+      //         booleanParam(name: 'INIT_DB', value: false)
+      //       ],
+      //       wait: false
+      //       // wait: false = fire and forget!
+      //       // CI pipeline finishes immediately
+      //       // CD runs independently! ✅
+      //     )
+      //     echo "✅ ECS CD triggered!"
+      //   }
+      // }
     }
     failure {
       node('') {
