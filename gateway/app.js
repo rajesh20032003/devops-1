@@ -17,7 +17,7 @@ const httpRequestDuration = new client.Histogram({
   name: 'http_request_duration_seconds',
   help: 'Request duration in seconds',
   labelNames: ['method', 'route', 'status'],
-  buckets: [0.1, 0.3, 0.5, 1, 2, 5]
+  buckets: [0.1, 0.3, 0.5, 1, 2]
 });
 const httpErrorsTotal = new client.Counter({
   name: 'http_errors_total',

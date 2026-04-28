@@ -786,7 +786,7 @@ pipeline {
   git config --global user.name "jenkins CI"
   
   rm -rf devops-1-k8-agrocd
-  git clone https://${GITHUB_TOKEN}@github.com/rajesh20032003/devops-1-k8-agrocd.git
+git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git
   cd devops-1-k8-agrocd
 
   # Combine all the individual files into one list and loop
