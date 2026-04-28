@@ -263,8 +263,12 @@ pipeline {
       agent any
       steps {
         script {
-          env.IMAGE_TAG = env.TAG_NAME ?: "dev-${env.BUILD_NUMBER}"
-          echo "Image tag: ${env.IMAGE_TAG}"
+          def gitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          
+          // Use the Git SHA as the image tag!
+          env.IMAGE_TAG = gitSha
+          
+          echo "Building images with tag: ${env.IMAGE_TAG}"
         }
       }
     }
@@ -770,20 +774,31 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'github-gitops-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]){
         sh """
+          # 1. Safety check: Did we actually build any images?
+          if [ ! -f built_services.txt ]; then
+            echo "No services built in this run. Skipping GitOps update."
+            exit 0
+          fi
+
           git config --global user.email "jenkins@micro-dash.com"
           git config --global user.name "jenkins CI"
 
-          git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git > /dev/null 2>&1
-              cd devops-1-k8-agrocd
+          # 2. FIX: Delete the leftover folder from previous failed builds
+          rm -rf devops-1-k8-agrocd
+
+          # 3. FIX: Removed > /dev/null so we can read the errors!
+          git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/rajesh20032003/devops-1-k8-agrocd.git
+          
+          cd devops-1-k8-agrocd
+          
           for SERVICE in \$(cat ../built_services.txt); do
-                  echo "Updating YAML for \$SERVICE to tag ${env.IMAGE_TAG}..."
-                  
-                  docker run --rm \
-                    --volumes-from \$(cat /etc/hostname) \
-                    -w \$(pwd) \
-                    mikefarah/yq -i ".\$SERVICE.Tag = \\"${env.IMAGE_TAG}\\"" values.yaml
-                  
-                done
+            echo "Updating YAML for \$SERVICE to tag ${env.IMAGE_TAG}..."
+            
+            docker run --rm \
+              --volumes-from \$(cat /etc/hostname) \
+              -w \$(pwd) \
+              mikefarah/yq -i ".\$SERVICE.Tag = \\"${env.IMAGE_TAG}\\"" values.yaml
+          done
 
           git add values.yaml
           git commit -m "ci: deploy ${env.IMAGE_TAG} for \$(cat ../built_services.txt | tr '\\n' ' ')"
