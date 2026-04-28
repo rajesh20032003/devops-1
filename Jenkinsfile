@@ -768,7 +768,7 @@ pipeline {
       }
       agent any 
       steps {
-        withCredentials([usernamePassword(credentialsId: 'github-gitops-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')])
+        withCredentials([usernamePassword(credentialsId: 'github-gitops-token', passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]){
         sh """
           git config --global user.email "jenkins@micro-dash.com"
           git config --global user.name "jenkins CI"
@@ -784,6 +784,7 @@ pipeline {
           git commit -m "ci: deploy ${env.IMAGE_TAG} for \$(cat ../built_services.txt | tr '\\n' ' ')"
           git push origin HEAD:main 
         """
+      }
       }
     }
 
