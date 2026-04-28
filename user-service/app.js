@@ -97,7 +97,7 @@ const initDB = async () => {
           ('Alice', 'alice@example.com'),
           ('Bob', 'bob@example.com')
       `);
-      console.log('✅ Users seeded!!!');
+      console.log('✅ Users seeded');
     }
     console.log('✅ Users DB initialized!');
   } catch (err) {
