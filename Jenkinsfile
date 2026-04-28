@@ -172,7 +172,7 @@ pipeline {
       steps {
         measureStage('SonarQube_Analysis') {
            script {
-        try { 
+       try { 
               unstash name: 'coverage-gateway' 
             } catch (e) { 
               echo "No gateway coverage stash found. Skipping." 
@@ -190,7 +190,7 @@ pipeline {
               echo "No order-service coverage stash found. Skipping." 
             }
           }
-      }
+      
           withSonarQubeEnv('sonarqube') {
             sh '''
               rm -rf $WORKSPACE/.scannerwork
