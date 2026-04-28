@@ -749,7 +749,7 @@ pipeline {
   stage('update gitops manifests') {
       when {
         beforeAgent true 
-        anyOf { branch 'main', buildingTag() }
+        anyOf { branch 'main'; buildingTag() }
       }
       agent any 
       steps {
