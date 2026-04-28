@@ -58,3 +58,11 @@ also dont understand how the container getting the data and required permission
     Jenkins tells K8s API: DELETE pod jenkins-k8s-agent-abc123
     Pod, all containers, all processes → gone
     Clean slate for next build
+
+
+    minikube stop
+minikube start --apiserver-cert-extra-sans=34.133.110.141
+
+minikube start --apiserver-ips=34.133.110.141
+pkill socat 2>/dev/null || true
+nohup socat TCP-LISTEN:8443,fork,reuseaddr TCP:$(minikube ip):8443 > /tmp/socat.log 2>&1 &
