@@ -91,7 +91,7 @@ async function getPool() {
       console.error('DB connection failed:', err.message);
       pool = null; // reset so next request retries
     } else {
-      console.log('DB connected successfully! ✅');
+      console.log('DB connected successfully!! ✅');
       release();
     }
   });
