@@ -795,7 +795,7 @@ git clone https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com/rajesh20032003/de
     
     # Update the specific service in values.yaml
     docker run --rm --volumes-from \$(hostname) -w \$(pwd) mikefarah/yq \
-      -i ".\${svc}.Tag = \"${env.IMAGE_TAG}\"" values.yaml
+      -i '.\${svc}.Tag = "${env.IMAGE_TAG}"' values.yaml
   done
 
   # Combine them for the commit message
