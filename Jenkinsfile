@@ -285,7 +285,7 @@ pipeline {
           steps {
             measureStage('Build_Push_frontend') {
               BuildAndPush('frontend', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "frontend" >> built_services.txt'
+              sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
             }
             
           }
@@ -297,7 +297,7 @@ pipeline {
           steps {
             measureStage('Build_Push_gateway') {
               BuildAndPush('gateway', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "gateway" >> built_services.txt'
+             sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
             }
           }
         }
@@ -308,7 +308,7 @@ pipeline {
           steps {
             measureStage('Build_Push_user_service') {
               BuildAndPush('user-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "user-service" >> built_services.txt'
+              sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
             }
           }
         }
@@ -319,7 +319,7 @@ pipeline {
           steps {
             measureStage('Build_Push_order_service') {
               BuildAndPush('order-service', env.HARBOR_REGISTRY, env.HARBOR_PROJECT)
-              sh 'echo "order-service" >> built_services.txt'
+              sh 'echo "${SERVICE}" > ${SERVICE}_updated.txt'
             }
           }
         }
@@ -791,14 +791,16 @@ pipeline {
           
           cd devops-1-k8-agrocd
           
-          for SERVICE in \$(cat ../built_services.txt | sort -u); do
-            echo "Updating YAML for \$SERVICE to tag ${env.IMAGE_TAG}..."
-            
-            docker run --rm \
-              --volumes-from \$(cat /etc/hostname) \
-              -w \$(pwd) \
-              mikefarah/yq -i ".\$SERVICE.Tag = \\"${env.IMAGE_TAG}\\"" values.yaml
-          done
+          for svc in \$(cat ../*_updated.txt | sort -u); do
+  echo "Updating YAML for \$svc to tag ${env.IMAGE_TAG}..."
+  
+  # Run your yq command
+  docker run --rm --volumes-from \$(hostname) -w \$(pwd) mikefarah/yq \
+    -i ".\${svc}.Tag = \"${env.IMAGE_TAG}\"" values.yaml
+done
+
+# Combine them for the commit message so it says "frontend gateway user-service"
+UPDATED_SERVICES=\$(cat ../*_updated.txt | sort -u | tr '\n' ' ')
 
           git add values.yaml
           git commit -m "ci: deploy ${env.IMAGE_TAG} for \$(cat ../built_services.txt | tr '\\n' ' ')"

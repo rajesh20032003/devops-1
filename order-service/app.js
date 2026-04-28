@@ -42,7 +42,7 @@ app.post('/orders', async (req, res) => {
 app.get('/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
-    res.json({ status: 'UP', db: 'UP!' });
+    res.json({ status: 'UP', db: 'UP' });
   } catch (err) {
     res.status(503).json({ status: 'UP', db: 'DOWN', error: err.message });
   }
