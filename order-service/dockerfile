@@ -14,7 +14,7 @@ WORKDIR /app
 COPY package.json .
 RUN npm install
 COPY . .
-FROM gcr.io/distroless/nodejs22-debian12
+FROM gcr.io/distroless/nodejs22-debian13
 COPY --from=build /app /app
 WORKDIR /app
 USER 65532

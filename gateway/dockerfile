@@ -7,11 +7,12 @@
 # single build 139 mb 
 #gateway
 from node:22-alpine as builder
+RUN apk update && apk upgrade --no-cache
 workdir /app
 copy package*.json ./
 run npm ci --omit=dev
 copy . . 
-from gcr.io/distroless/nodejs22-debian12
+from gcr.io/distroless/nodejs22-debian13
 workdir /app
 copy --from=builder /app /app
 user nonroot
